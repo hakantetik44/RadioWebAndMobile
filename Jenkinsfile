@@ -68,7 +68,7 @@ pipeline {
                             sh """
                                 ${M2_HOME}/bin/mvn test \
                                 -Dtest=runner.TestRunner \
-                                -Dcucumber.plugin="pretty,json:target/cucumber.json,utils.formatter.PrettyReports:target/cucumber-pretty-reports,io.qameta.allure.cucumber7jvm.AllureCucumber7Jvm" \
+                                -Dcucumber.plugin="pretty,json:target/cucumber.json,io.qameta.allure.cucumber7jvm.AllureCucumber7Jvm" \
                                 | tee execution.log
                             """
                         }
@@ -83,6 +83,7 @@ pipeline {
         stage('Generate Reports') {
             steps {
                 script {
+                    // Allure raporlarını oluşturmak için gerekli komutlar
                     sh """
                         ${M2_HOME}/bin/mvn verify -DskipTests
                         mkdir -p ${CUCUMBER_REPORTS}
