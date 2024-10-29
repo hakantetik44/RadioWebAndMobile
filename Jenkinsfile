@@ -16,6 +16,7 @@ pipeline {
         TIMESTAMP = new Date().format('yyyy-MM-dd_HH-mm-ss')
         CUCUMBER_REPORTS = 'target/cucumber-reports'
         ALLURE_RESULTS = 'target/allure-results'
+        PDF_REPORT = "Test_Report_${TIMESTAMP}.pdf" // PDF rapor dosyası
     }
 
     stages {
@@ -32,22 +33,22 @@ pipeline {
                 checkout scm
 
                 sh '''
-                    echo "JAVA_HOME = ${JAVA_HOME}"
-                    echo "M2_HOME = ${M2_HOME}"
-                    echo "PATH = ${PATH}"
+                    echo "\033[0;36mJAVA_HOME = ${JAVA_HOME}\033[0m"
+                    echo "\033[0;36mM2_HOME = ${M2_HOME}\033[0m"
+                    echo "\033[0;36mPATH = ${PATH}\033[0m"
 
                     if [ -z "$JAVA_HOME" ]; then
-                        echo "JAVA_HOME is not set!"
+                        echo "\033[0;31mJAVA_HOME is not set!\033[0m"
                         exit 1
                     fi
 
                     if [ ! -x "${JAVA_HOME}/bin/java" ]; then
-                        echo "Java is not available in JAVA_HOME!"
+                        echo "\033[0;31mJava is not available in JAVA_HOME!\033[0m"
                         exit 1
                     fi
 
                     java -version
-                    mvn -version || { echo "Maven is not available!"; exit 1; }
+                    mvn -version || { echo "\033[0;31mMaven is not available!\033[0m"; exit 1; }
                 '''
             }
         }
@@ -62,7 +63,7 @@ pipeline {
             steps {
                 script {
                     try {
-                        echo "🚀 Running Tests in Headless Mode..."
+                        echo "\033[0;32m🚀 Running Tests in Headless Mode...\033[0m"
                         withEnv(["JAVA_HOME=${JAVA_HOME}"]) {
                             sh """
                                 ${M2_HOME}/bin/mvn test \
@@ -96,6 +97,12 @@ pipeline {
                         reportBuildPolicy: 'ALWAYS',
                         results: [[path: ALLURE_RESULTS]]
                     ])
+
+                    // HTML raporunu PDF'ye dönüştür
+                    echo "\033[0;34mGenerating PDF Report...\033[0m"
+                    sh """
+                        wkhtmltopdf ${BUILD_URL}cucumber-html-reports/overview-features.html ${PDF_REPORT}
+                    """
                 }
             }
             post {
@@ -105,7 +112,8 @@ pipeline {
                         target/cucumber.json,
                         ${ALLURE_RESULTS}/**/*,
                         target/screenshots/**/*,
-                        execution.log
+                        execution.log,
+                        ${PDF_REPORT}
                     """, allowEmptyArchive: true
 
                     cucumber buildStatus: 'UNSTABLE',
@@ -135,6 +143,7 @@ pipeline {
                     📝 Reports:
                     - Cucumber Report: ${BUILD_URL}cucumber-html-reports/overview-features.html
                     - Allure Report: ${BUILD_URL}allure/
+                    - PDF Report: ${BUILD_URL}${PDF_REPORT}
 
                     ${currentBuild.result == 'SUCCESS' ? '✅ SUCCESS' : '❌ FAILED'}
                 """
