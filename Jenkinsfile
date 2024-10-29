@@ -10,7 +10,7 @@ pipeline {
     environment {
         JAVA_HOME = "/usr/local/opt/openjdk@17" // Güncellenmiş JAVA_HOME
         M2_HOME = tool 'maven' // Maven'ı Jenkins'ten al
-        PATH = "${JAVA_HOME}/bin:${M2_HOME}/bin:${PATH}" // Doğru PATH ayarı
+        PATH = "${JAVA_HOME}/bin:${M2_HOME}/bin:/usr/local/bin:${PATH}" // Doğru PATH ayarı
         MAVEN_OPTS = '-Xmx3072m'
         PROJECT_NAME = 'Radio BDD Automation Tests'
         TIMESTAMP = new Date().format('yyyy-MM-dd_HH-mm-ss')
@@ -101,7 +101,12 @@ pipeline {
                     // HTML raporunu PDF'ye dönüştür
                     echo "\033[0;34mGenerating PDF Report...\033[0m"
                     sh """
-                        wkhtmltopdf ${BUILD_URL}cucumber-html-reports/overview-features.html ${PDF_REPORT}
+                        if command -v wkhtmltopdf &> /dev/null; then
+                            wkhtmltopdf ${BUILD_URL}cucumber-html-reports/overview-features.html ${PDF_REPORT}
+                        else
+                            echo "\033[0;31mError: wkhtmltopdf not found!\033[0m"
+                            exit 1
+                        fi
                     """
                 }
             }
