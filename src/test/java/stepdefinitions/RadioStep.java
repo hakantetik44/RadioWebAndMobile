@@ -1,5 +1,6 @@
 package stepdefinitions;
 
+import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;
 import io.cucumber.java.en.When;
 import pages.RadioPage;
@@ -39,6 +40,15 @@ public class RadioStep {
         Thread.sleep(3000);
         assertEquals(expectedUrl, actualUrl);
     }
+    @Given("Click le button Se Connecter")
+    public void click_le_button_se_connecter() {
+       radioPage.clikBtnSeConnecter();
+    }
+    @Then("Click sur Inscription")
+    public void click_sur_inscription() {
+        radioPage.clikBtnInscription();
+    }
+
 
 
 
