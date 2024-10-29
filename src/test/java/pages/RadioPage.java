@@ -37,7 +37,7 @@ public class RadioPage extends BasePage {
     public void clikBtnInscription() {
         By btnInscription = OS.isAndroid() ?
                 AppiumBy.accessibilityId("Inscription") :        //duzeltilecek
-                By.xpath("//*[text()='Inscription']");
+                By.xpath("/html/body/div[2]/footer/div[2]/div[2]/div/div/div/div[2]/div/div/nav/ul/li[2]");
         getCurrentDriver().findElement(btnInscription).click();
     }
 
