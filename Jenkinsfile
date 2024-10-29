@@ -10,7 +10,7 @@ pipeline {
     environment {
         JAVA_HOME = "/usr/local/opt/openjdk@17" // Güncellenmiş JAVA_HOME
         M2_HOME = tool 'maven' // Maven'ı Jenkins'ten al
-        PATH = "${JAVA_HOME}/bin:${M2_HOME}/bin:/usr/local/bin:${PATH}" // Doğru PATH ayarı
+        PATH = "${JAVA_HOME}/bin:${M2_HOME}/bin:${PATH}" // Doğru PATH ayarı
         MAVEN_OPTS = '-Xmx3072m'
         PROJECT_NAME = 'Radio BDD Automation Tests'
         TIMESTAMP = new Date().format('yyyy-MM-dd_HH-mm-ss')
@@ -55,7 +55,7 @@ pipeline {
 
         stage('Build & Dependencies') {
             steps {
-                sh "${M2_HOME}/bin/mvn clean install -DskipTests"
+                sh "${M2_HOME}/bin/mvn clean install -DskipTests || { echo 'Build failed'; exit 1; }"
             }
         }
 
@@ -71,7 +71,7 @@ pipeline {
                                 -Dcucumber.plugin="pretty,json:target/cucumber.json,io.qameta.allure.cucumber7jvm.AllureCucumber7Jvm" \
                                 -Dwebdriver.chrome.headless=true \
                                 -Dwebdriver.chrome.args="--headless,--disable-gpu,--window-size=1920,1080" \
-                                | tee execution.log
+                                | tee execution.log || { echo "Maven test failed"; currentBuild.result = 'FAILURE'; exit 1; }
                             """
                         }
                     } catch (Exception e) {
@@ -86,7 +86,7 @@ pipeline {
             steps {
                 script {
                     sh """
-                        ${M2_HOME}/bin/mvn verify -DskipTests
+                        ${M2_HOME}/bin/mvn verify -DskipTests || { echo 'Report generation failed'; exit 1; }
                         mkdir -p ${CUCUMBER_REPORTS}
                     """
 
@@ -101,12 +101,7 @@ pipeline {
                     // HTML raporunu PDF'ye dönüştür
                     echo "\033[0;34mGenerating PDF Report...\033[0m"
                     sh """
-                        if command -v wkhtmltopdf &> /dev/null; then
-                            wkhtmltopdf ${BUILD_URL}cucumber-html-reports/overview-features.html ${PDF_REPORT}
-                        else
-                            echo "\033[0;31mError: wkhtmltopdf not found!\033[0m"
-                            exit 1
-                        fi
+                        wkhtmltopdf ${BUILD_URL}cucumber-html-reports/overview-features.html ${PDF_REPORT} || { echo 'PDF report generation failed'; exit 1; }
                     """
                 }
             }
