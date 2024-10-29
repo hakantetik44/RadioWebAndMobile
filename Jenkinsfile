@@ -3,7 +3,7 @@ pipeline {
 
     tools {
         maven 'maven' // Jenkins içinde tanımlı Maven
-        jdk 'openjdk@17' // Jenkins üzerinde tanımlı olan JDK17
+        jdk 'JDK17' // Jenkins üzerinde tanımlı olan JDK17
     }
 
     environment {
