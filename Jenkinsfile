@@ -6,16 +6,16 @@ pipeline {
         jdk 'JDK17'
     }
 
-    environment {
-        JAVA_HOME = '/usr/local/opt/openjdk@17'
-        M2_HOME = tool 'maven'
-        PATH = "${JAVA_HOME}/bin:${M2_HOME}/bin:${PATH}"
-        MAVEN_OPTS = '-Xmx3072m'  // MaxPermSize kaldırıldı
-        PROJECT_NAME = 'Radio BDD Automations Tests'
-        TIMESTAMP = new Date().format('yyyy-MM-dd_HH-mm-ss')
-        CUCUMBER_REPORTS = 'target/cucumber-reports'
-        ALLURE_RESULTS = 'target/allure-results'
-    }
+   environment {
+       JAVA_HOME = '/usr/local/opt/openjdk@17' // Başında '/' işareti olmalı
+       M2_HOME = tool 'maven'
+       PATH = "${JAVA_HOME}/bin:${M2_HOME}/bin:${PATH}"
+       MAVEN_OPTS = '-Xmx3072m'  // MaxPermSize kaldırıldı
+       PROJECT_NAME = 'Radio BDD Automations Tests'
+       TIMESTAMP = new Date().format('yyyy-MM-dd_HH-mm-ss')
+       CUCUMBER_REPORTS = 'target/cucumber-reports'
+       ALLURE_RESULTS = 'target/allure-results'
+   }
 
     stages {
         stage('Initialize') {
