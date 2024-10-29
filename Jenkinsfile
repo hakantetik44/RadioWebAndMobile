@@ -2,53 +2,40 @@ pipeline {
     agent any
 
     tools {
-        maven 'maven' // Jenkins üzerinde tanımlı Maven
-        jdk 'JDK17' // Jenkins üzerinde tanımlı olan JDK17
-        allure 'Allure' // Jenkins üzerinde tanımlı olan Allure
+        maven 'maven'
+        jdk 'JDK17'
+        allure 'Allure'
     }
 
     environment {
-        JAVA_HOME = "/usr/local/opt/openjdk@17" // Güncellenmiş JAVA_HOME
-        M2_HOME = tool 'maven' // Maven'ı Jenkins'ten al
-        PATH = "${JAVA_HOME}/bin:${M2_HOME}/bin:${PATH}" // Doğru PATH ayarı
+        JAVA_HOME = "/usr/local/opt/openjdk@17"
+        M2_HOME = tool 'maven'
+        PATH = "${JAVA_HOME}/bin:${M2_HOME}/bin:${PATH}"
         MAVEN_OPTS = '-Xmx3072m'
         PROJECT_NAME = 'Radio BDD Automation Tests'
         TIMESTAMP = new Date().format('yyyy-MM-dd_HH-mm-ss')
         CUCUMBER_REPORTS = 'target/cucumber-reports'
         ALLURE_RESULTS = 'target/allure-results'
-        PDF_REPORT = "Test_Report_${TIMESTAMP}.pdf" // PDF rapor dosyası
+        PDF_REPORT = "Test_Report_${TIMESTAMP}.pdf"
     }
 
     stages {
         stage('Initialize') {
             steps {
                 script {
-                    echo """
-                        ╔══════════════════════════════════╗
-                        ║      Test Automation Start       ║
-                        ╚══════════════════════════════════╝
-                    """
+                    echo "Initializing Test Environment"
                 }
                 cleanWs()
                 checkout scm
 
                 sh '''
-                    echo "\033[0;36mJAVA_HOME = ${JAVA_HOME}\033[0m"
-                    echo "\033[0;36mM2_HOME = ${M2_HOME}\033[0m"
-                    echo "\033[0;36mPATH = ${PATH}\033[0m"
-
+                    echo "Checking JAVA_HOME and Maven"
                     if [ -z "$JAVA_HOME" ]; then
-                        echo "\033[0;31mJAVA_HOME is not set!\033[0m"
+                        echo "JAVA_HOME is not set!"
                         exit 1
                     fi
-
-                    if [ ! -x "${JAVA_HOME}/bin/java" ]; then
-                        echo "\033[0;31mJava is not available in JAVA_HOME!\033[0m"
-                        exit 1
-                    fi
-
                     java -version
-                    mvn -version || { echo "\033[0;31mMaven is not available!\033[0m"; exit 1; }
+                    mvn -version || { echo "Maven is not available!"; exit 1; }
                 '''
             }
         }
@@ -63,7 +50,7 @@ pipeline {
             steps {
                 script {
                     try {
-                        echo "\033[0;32m🚀 Running Tests in Headless Mode...\033[0m"
+                        echo "Running Tests..."
                         withEnv(["JAVA_HOME=${JAVA_HOME}"]) {
                             sh """
                                 ${M2_HOME}/bin/mvn test \
@@ -73,11 +60,6 @@ pipeline {
                                 -Dwebdriver.chrome.args="--headless,--disable-gpu,--window-size=1920,1080" \
                                 | tee execution.log
                             """
-                        }
-                        // Sonuç kontrolü ekle
-                        if (currentBuild.result != 'SUCCESS') {
-                            currentBuild.result = 'FAILURE'
-                            error("Tests did not complete successfully!")
                         }
                     } catch (Exception e) {
                         currentBuild.result = 'FAILURE'
@@ -93,9 +75,7 @@ pipeline {
                 script {
                     sh """
                         ${M2_HOME}/bin/mvn verify -DskipTests
-                        mkdir -p ${CUCUMBER_REPORTS}
                     """
-
                     allure([
                         includeProperties: false,
                         jdk: '',
@@ -104,8 +84,7 @@ pipeline {
                         results: [[path: ALLURE_RESULTS]]
                     ])
 
-                    // HTML raporunu PDF'ye dönüştür
-                    echo "\033[0;34mGenerating PDF Report...\033[0m"
+                    echo "Generating PDF Report..."
                     sh """
                         wkhtmltopdf ${BUILD_URL}cucumber-html-reports/overview-features.html ${PDF_REPORT}
                     """
@@ -139,21 +118,17 @@ pipeline {
                 }
 
                 echo """
-                    ╔══════════════════════════════════╗
-                    ║       Test Execution Summary     ║
-                    ╚══════════════════════════════════╝
-
-                    📊 Test Results:
+                    Test Execution Summary:
                     ${testResults}
 
-                    📝 Reports:
+                    Reports:
                     - Cucumber Report: ${BUILD_URL}cucumber-html-reports/overview-features.html
                     - Allure Report: ${BUILD_URL}allure/
                     - PDF Report: ${BUILD_URL}${PDF_REPORT}
 
                     ${currentBuild.result == 'SUCCESS' ? '✅ SUCCESS' : '❌ FAILED'}
                 """
-                echo "\033[0;31mCurrent Build Result: ${currentBuild.result}\033[0m" // Eklenen log
+                echo "Current Build Result: ${currentBuild.result}"
             }
             cleanWs()
         }
