@@ -10,7 +10,7 @@ pipeline {
         JAVA_HOME = '/usr/local/opt/openjdk@17'
         M2_HOME = tool 'maven'
         PATH = "${JAVA_HOME}/bin:${M2_HOME}/bin:${PATH}"
-        MAVEN_OPTS = '-Xmx3072m'  // MaxPermSize removed
+        MAVEN_OPTS = '-Xmx3072m'
         PROJECT_NAME = 'Radio BDD Automations Tests'
         TIMESTAMP = new Date().format('yyyy-MM-dd_HH-mm-ss')
         CUCUMBER_REPORTS = 'target/cucumber-reports'
@@ -41,10 +41,7 @@ pipeline {
 
         stage('Build & Dependencies') {
             steps {
-                sh """
-                    ${M2_HOME}/bin/mvn clean install -DskipTests
-                    // Checkstyle verification removed
-                """
+                sh "${M2_HOME}/bin/mvn clean install -DskipTests"
             }
         }
 
@@ -53,12 +50,14 @@ pipeline {
                 script {
                     try {
                         echo "🚀 Running Tests..."
-                        sh """
-                            ${M2_HOME}/bin/mvn test \
-                            -Dtest=runner.TestRunner \
-                            -Dcucumber.plugin="pretty,json:target/cucumber.json,utils.formatter.PrettyReports:target/cucumber-pretty-reports,io.qameta.allure.cucumber7jvm.AllureCucumber7Jvm" \
-                            | tee execution.log
-                        """
+                        withEnv(["JAVA_HOME=${JAVA_HOME}"]) {
+                            sh """
+                                ${M2_HOME}/bin/mvn test \
+                                -Dtest=runner.TestRunner \
+                                -Dcucumber.plugin="pretty,json:target/cucumber.json,utils.formatter.PrettyReports:target/cucumber-pretty-reports,io.qameta.allure.cucumber7jvm.AllureCucumber7Jvm" \
+                                | tee execution.log
+                            """
+                        }
                     } catch (Exception e) {
                         currentBuild.result = 'FAILURE'
                         throw e
@@ -70,13 +69,11 @@ pipeline {
         stage('Generate Reports') {
             steps {
                 script {
-                    // Generate Cucumber Reports
                     sh """
                         ${M2_HOME}/bin/mvn verify -DskipTests
                         mkdir -p ${CUCUMBER_REPORTS}
                     """
 
-                    // Generate Allure Report
                     allure([
                         includeProperties: false,
                         jdk: '',
