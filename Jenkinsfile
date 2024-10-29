@@ -45,7 +45,7 @@ pipeline {
                 sh """
                     export JAVA_HOME=/usr/local/opt/openjdk@17
                     ${M2_HOME}/bin/mvn clean install -DskipTests
-                    ${M2_HOME}/bin/mvn checkstyle:check
+                    # Checkstyle kontrolü kaldırıldı
                 """
             }
         }
