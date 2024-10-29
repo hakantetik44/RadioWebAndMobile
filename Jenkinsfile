@@ -31,21 +31,22 @@ pipeline {
                 checkout scm
 
                 sh '''
-                    export JAVA_HOME=/usr/local/opt/openjdk@17
                     echo "JAVA_HOME = ${JAVA_HOME}"
                     echo "M2_HOME = ${M2_HOME}"
                     java -version
-                    ${M2_HOME}/bin/mvn -version
+                    mvn -version
                 '''
             }
         }
 
         stage('Build & Dependencies') {
             steps {
+                script {
+                    echo "🔄 Building project and resolving dependencies..."
+                }
                 sh """
-                    export JAVA_HOME=/usr/local/opt/openjdk@17
-                    ${M2_HOME}/bin/mvn clean install -DskipTests
-                    ${M2_HOME}/bin/mvn checkstyle:check
+                    mvn clean install -DskipTests
+                    mvn checkstyle:check
                 """
             }
         }
@@ -53,11 +54,10 @@ pipeline {
         stage('Run Tests') {
             steps {
                 script {
+                    echo "🚀 Running Tests..."
                     try {
-                        echo "🚀 Running Tests..."
                         sh """
-                            export JAVA_HOME=/usr/local/opt/openjdk@17
-                            ${M2_HOME}/bin/mvn test \
+                            mvn test \
                             -Dtest=runner.TestRunner \
                             -Dcucumber.plugin="pretty,json:target/cucumber.json,utils.formatter.PrettyReports:target/cucumber-pretty-reports,io.qameta.allure.cucumber7jvm.AllureCucumber7Jvm" \
                             | tee execution.log
@@ -73,14 +73,12 @@ pipeline {
         stage('Generate Reports') {
             steps {
                 script {
-                    // Cucumber Reports
+                    echo "📊 Generating Reports..."
                     sh """
-                        export JAVA_HOME=/usr/local/opt/openjdk@17
-                        ${M2_HOME}/bin/mvn verify -DskipTests
+                        mvn verify -DskipTests
                         mkdir -p ${CUCUMBER_REPORTS}
                     """
 
-                    // Allure Report
                     allure([
                         includeProperties: false,
                         jdk: '',
