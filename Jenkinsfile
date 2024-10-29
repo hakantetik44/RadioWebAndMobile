@@ -76,6 +76,7 @@ pipeline {
                         }
                     } catch (Exception e) {
                         currentBuild.result = 'FAILURE'
+                        echo "An error occurred: ${e.message}"
                         throw e
                     }
                 }
@@ -85,24 +86,23 @@ pipeline {
         stage('Generate Reports') {
             steps {
                 script {
-                    sh """
-                        ${M2_HOME}/bin/mvn verify -DskipTests || { echo 'Report generation failed'; exit 1; }
-                        mkdir -p ${CUCUMBER_REPORTS}
-                    """
+                    try {
+                        sh "${M2_HOME}/bin/mvn verify -DskipTests || { echo 'Report generation failed'; exit 1; }"
+                        allure([
+                            includeProperties: false,
+                            jdk: '',
+                            properties: [],
+                            reportBuildPolicy: 'ALWAYS',
+                            results: [[path: ALLURE_RESULTS]]
+                        ])
 
-                    allure([
-                        includeProperties: false,
-                        jdk: '',
-                        properties: [],
-                        reportBuildPolicy: 'ALWAYS',
-                        results: [[path: ALLURE_RESULTS]]
-                    ])
-
-                    // HTML raporunu PDF'ye dönüştür
-                    echo "\033[0;34mGenerating PDF Report...\033[0m"
-                    sh """
-                        wkhtmltopdf ${BUILD_URL}cucumber-html-reports/overview-features.html ${PDF_REPORT} || { echo 'PDF report generation failed'; exit 1; }
-                    """
+                        // HTML raporunu PDF'ye dönüştür
+                        echo "\033[0;34mGenerating PDF Report...\033[0m"
+                        sh "wkhtmltopdf ${BUILD_URL}cucumber-html-reports/overview-features.html ${PDF_REPORT} || { echo 'PDF report generation failed'; exit 1; }"
+                    } catch (Exception e) {
+                        currentBuild.result = 'FAILURE'
+                        echo "Error in report generation: ${e.message}"
+                    }
                 }
             }
             post {
