@@ -3,131 +3,71 @@ pipeline {
 
     tools {
         maven 'maven'
-        jdk 'JDK17'
+        jdk 'JDK17'  // JDK ayarını burada kontrol edin
     }
 
     environment {
-        JAVA_HOME = '/usr/local/opt/openjdk@17'  // JAVA_HOME doğru ayarlandı
-        M2_HOME = tool 'maven'
+        JAVA_HOME = tool('JDK17') // JDK17'nin doğru bir şekilde ayarlandığından emin olun
+        M2_HOME = tool('maven')
         PATH = "${JAVA_HOME}/bin:${M2_HOME}/bin:${PATH}"
-        MAVEN_OPTS = '-Xmx3072m'  // MaxPermSize kaldırıldı
-        PROJECT_NAME = 'Radio BDD Automations Tests'
-        TIMESTAMP = new Date().format('yyyy-MM-dd_HH-mm-ss')
-        CUCUMBER_REPORTS = 'target/cucumber-reports'
-        ALLURE_RESULTS = 'target/allure-results'
+        MAVEN_OPTS = '-Xmx3072m'
     }
 
     stages {
         stage('Initialize') {
             steps {
-                script {
-                    echo """
-                        ╔══════════════════════════════════╗
-                        ║      Test Automation Start       ║
-                        ╚══════════════════════════════════╝
-                    """
-                }
                 cleanWs()
-                checkout scm
-
-                // JAVA_HOME ve M2_HOME kontrolü
-                sh '''
-                    echo "JAVA_HOME = ${JAVA_HOME}"
-                    echo "M2_HOME = ${M2_HOME}"
-                    java -version
-                    ${M2_HOME}/bin/mvn -version
-                '''
+                echo """
+                    ╔══════════════════════════════════╗
+                    ║      Test Automation Start       ║
+                    ╚══════════════════════════════════╝
+                """
+                script {
+                    // JAVA_HOME ve M2_HOME değişkenlerini kontrol et
+                    sh '''
+                        echo "JAVA_HOME = ${JAVA_HOME}"
+                        echo "M2_HOME = ${M2_HOME}"
+                        java -version
+                        mvn -version
+                    '''
+                }
             }
         }
 
         stage('Build & Dependencies') {
             steps {
                 sh """
-                    ${M2_HOME}/bin/mvn clean install -DskipTests
+                    mvn clean install -DskipTests
                 """
             }
         }
 
         stage('Run Tests') {
             steps {
-                script {
-                    try {
-                        echo "🚀 Running Tests..."
-                        sh """
-                            ${M2_HOME}/bin/mvn test \
-                            -Dtest=runner.TestRunner \
-                            -Dcucumber.plugin="pretty,json:target/cucumber.json,io.qameta.allure.cucumber7jvm.AllureCucumber7Jvm" \
-                            | tee execution.log
-                        """
-                    } catch (Exception e) {
-                        currentBuild.result = 'FAILURE'
-                        throw e
-                    }
-                }
+                sh """
+                    mvn test \
+                    -Dtest=runner.TestRunner \
+                    -Dcucumber.plugin="pretty,json:target/cucumber.json,io.qameta.allure.cucumber7jvm.AllureCucumber7Jvm" \
+                    | tee execution.log
+                """
             }
         }
 
         stage('Generate Reports') {
             steps {
-                script {
-                    // Cucumber Reports
-                    sh """
-                        ${M2_HOME}/bin/mvn verify -DskipTests
-                        mkdir -p ${CUCUMBER_REPORTS}
-                    """
-
-                    // Allure Report
-                    allure([
-                        includeProperties: false,
-                        jdk: '',
-                        properties: [],
-                        reportBuildPolicy: 'ALWAYS',
-                        results: [[path: 'target/allure-results']]
-                    ])
-                }
-            }
-            post {
-                always {
-                    archiveArtifacts artifacts: """
-                        target/cucumber-pretty-reports/**/*,
-                        target/cucumber.json,
-                        target/allure-results/**/*,
-                        target/screenshots/**/*,
-                        execution.log
-                    """, allowEmptyArchive: true
-
-                    cucumber buildStatus: 'UNSTABLE',
-                            fileIncludePattern: '**/cucumber.json',
-                            jsonReportDirectory: 'target'
-                }
+                sh "mvn verify -DskipTests"
             }
         }
     }
 
     post {
         always {
-            script {
-                def testResults = ""
-                if (fileExists('execution.log')) {
-                    testResults = readFile('execution.log').trim()
-                }
-
-                echo """
-                    ╔══════════════════════════════════╗
-                    ║       Test Execution Summary     ║
-                    ╚══════════════════════════════════╝
-
-                    📊 Test Results:
-                    ${testResults}
-
-                    📝 Reports:
-                    - Cucumber Report: ${BUILD_URL}cucumber-html-reports/overview-features.html
-                    - Allure Report: ${BUILD_URL}allure/
-
-                    ${currentBuild.result == 'SUCCESS' ? '✅ SUCCESS' : '❌ FAILED'}
-                """
-            }
-            cleanWs()
+            echo """
+                ╔══════════════════════════════════╗
+                ║       Test Execution Summary     ║
+                ╚══════════════════════════════════╝
+            """
+            archiveArtifacts artifacts: 'target/**/*', allowEmptyArchive: true
         }
     }
 }
