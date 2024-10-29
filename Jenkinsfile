@@ -7,8 +7,9 @@ pipeline {
     }
 
     environment {
-        JAVA_HOME = tool 'JDK17'
-        PATH = "${JAVA_HOME}/bin:${PATH}"
+        JAVA_HOME = '/usr/local/opt/openjdk@17'  // MacOS için doğru path
+        M2_HOME = tool 'maven'
+        PATH = "${JAVA_HOME}/bin:${M2_HOME}/bin:${PATH}"
         MAVEN_OPTS = '-Xmx3072m -XX:MaxPermSize=512m'
         PROJECT_NAME = 'Radio BDD Automations Tests'
         TIMESTAMP = new Date().format('yyyy-MM-dd_HH-mm-ss')
@@ -30,9 +31,11 @@ pipeline {
 
                 // Environment Check
                 sh '''
+                    export JAVA_HOME=/usr/local/opt/openjdk@17
                     echo "JAVA_HOME = ${JAVA_HOME}"
+                    echo "M2_HOME = ${M2_HOME}"
                     java -version
-                    mvn -version
+                    ${M2_HOME}/bin/mvn -version
                 '''
             }
         }
@@ -40,8 +43,9 @@ pipeline {
         stage('Build & Dependencies') {
             steps {
                 sh """
-                    mvn clean install -DskipTests
-                    mvn checkstyle:check
+                    export JAVA_HOME=/usr/local/opt/openjdk@17
+                    ${M2_HOME}/bin/mvn clean install -DskipTests
+                    ${M2_HOME}/bin/mvn checkstyle:check
                 """
             }
         }
@@ -52,7 +56,8 @@ pipeline {
                     try {
                         echo "🚀 Running Tests..."
                         sh """
-                            mvn test \
+                            export JAVA_HOME=/usr/local/opt/openjdk@17
+                            ${M2_HOME}/bin/mvn test \
                             -Dtest=runner.TestRunner \
                             -Dcucumber.plugin="pretty,json:target/cucumber.json,utils.formatter.PrettyReports:target/cucumber-pretty-reports" \
                             | tee execution.log
@@ -68,7 +73,8 @@ pipeline {
         stage('Generate Reports') {
             steps {
                 sh """
-                    mvn verify -DskipTests
+                    export JAVA_HOME=/usr/local/opt/openjdk@17
+                    ${M2_HOME}/bin/mvn verify -DskipTests
                     mkdir -p ${CUCUMBER_REPORTS}
                 """
             }
