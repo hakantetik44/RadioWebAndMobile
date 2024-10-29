@@ -6,16 +6,16 @@ pipeline {
         jdk 'JDK17'
     }
 
-   environment {
-       JAVA_HOME = '/usr/local/opt/openjdk@17' // Başında '/' işareti olmalı
-       M2_HOME = tool 'maven'
-       PATH = "${JAVA_HOME}/bin:${M2_HOME}/bin:${PATH}"
-       MAVEN_OPTS = '-Xmx3072m'  // MaxPermSize kaldırıldı
-       PROJECT_NAME = 'Radio BDD Automations Tests'
-       TIMESTAMP = new Date().format('yyyy-MM-dd_HH-mm-ss')
-       CUCUMBER_REPORTS = 'target/cucumber-reports'
-       ALLURE_RESULTS = 'target/allure-results'
-   }
+    environment {
+        JAVA_HOME = '/usr/local/opt/openjdk@17'
+        M2_HOME = tool 'maven'
+        PATH = "${JAVA_HOME}/bin:${M2_HOME}/bin:${PATH}"
+        MAVEN_OPTS = '-Xmx3072m'  // MaxPermSize kaldırıldı
+        PROJECT_NAME = 'Radio BDD Automations Tests'
+        TIMESTAMP = new Date().format('yyyy-MM-dd_HH-mm-ss')
+        CUCUMBER_REPORTS = 'target/cucumber-reports'
+        ALLURE_RESULTS = 'target/allure-results'
+    }
 
     stages {
         stage('Initialize') {
@@ -31,22 +31,21 @@ pipeline {
                 checkout scm
 
                 sh '''
+                    export JAVA_HOME=/usr/local/opt/openjdk@17
                     echo "JAVA_HOME = ${JAVA_HOME}"
                     echo "M2_HOME = ${M2_HOME}"
                     java -version
-                    mvn -version
+                    ${M2_HOME}/bin/mvn -version
                 '''
             }
         }
 
         stage('Build & Dependencies') {
             steps {
-                script {
-                    echo "🔄 Building project and resolving dependencies..."
-                }
                 sh """
-                    mvn clean install -DskipTests
-                    mvn checkstyle:check
+                    export JAVA_HOME=/usr/local/opt/openjdk@17
+                    ${M2_HOME}/bin/mvn clean install -DskipTests
+                    ${M2_HOME}/bin/mvn checkstyle:check
                 """
             }
         }
@@ -54,10 +53,11 @@ pipeline {
         stage('Run Tests') {
             steps {
                 script {
-                    echo "🚀 Running Tests..."
                     try {
+                        echo "🚀 Running Tests..."
                         sh """
-                            mvn test \
+                            export JAVA_HOME=/usr/local/opt/openjdk@17
+                            ${M2_HOME}/bin/mvn test \
                             -Dtest=runner.TestRunner \
                             -Dcucumber.plugin="pretty,json:target/cucumber.json,utils.formatter.PrettyReports:target/cucumber-pretty-reports,io.qameta.allure.cucumber7jvm.AllureCucumber7Jvm" \
                             | tee execution.log
@@ -73,12 +73,14 @@ pipeline {
         stage('Generate Reports') {
             steps {
                 script {
-                    echo "📊 Generating Reports..."
+                    // Cucumber Reports
                     sh """
-                        mvn verify -DskipTests
+                        export JAVA_HOME=/usr/local/opt/openjdk@17
+                        ${M2_HOME}/bin/mvn verify -DskipTests
                         mkdir -p ${CUCUMBER_REPORTS}
                     """
 
+                    // Allure Report
                     allure([
                         includeProperties: false,
                         jdk: '',

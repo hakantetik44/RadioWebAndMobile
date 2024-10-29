@@ -23,15 +23,26 @@
     </properties>
 
     <dependencies>
-        <!-- Selenium -->
+        <!-- Webdriver Manager -->
         <dependency>
             <groupId>org.seleniumhq.selenium</groupId>
-            <artifactId>selenium-java</artifactId>
+            <artifactId>selenium-remote-driver</artifactId>
             <version>${selenium.version}</version>
-            <scope>test</scope>
         </dependency>
 
         <!-- Cucumber -->
+        <dependency>
+            <groupId>io.cucumber</groupId>
+            <artifactId>cucumber-picocontainer</artifactId>
+            <version>${cucumber.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.cucumber</groupId>
+            <artifactId>cucumber-plugin</artifactId>
+            <version>${cucumber.version}</version>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>io.cucumber</groupId>
             <artifactId>cucumber-java</artifactId>
@@ -43,6 +54,25 @@
             <artifactId>cucumber-junit</artifactId>
             <version>${cucumber.version}</version>
             <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.cucumber</groupId>
+            <artifactId>cucumber-core</artifactId>
+            <version>${cucumber.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Selenium -->
+        <dependency>
+            <groupId>org.seleniumhq.selenium</groupId>
+            <artifactId>selenium-java</artifactId>
+            <version>${selenium.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.seleniumhq.selenium</groupId>
+            <artifactId>selenium-api</artifactId>
+            <version>${selenium.version}</version>
         </dependency>
 
         <!-- JUnit -->
@@ -70,6 +100,20 @@
             <groupId>org.apache.logging.log4j</groupId>
             <artifactId>log4j-core</artifactId>
             <version>${log4j.version}</version>
+        </dependency>
+
+        <!-- JavaFaker -->
+        <dependency>
+            <groupId>com.github.javafaker</groupId>
+            <artifactId>javafaker</artifactId>
+            <version>1.0.2</version>
+        </dependency>
+
+        <!-- OSMosis TagFilter -->
+        <dependency>
+            <groupId>org.openstreetmap.osmosis</groupId>
+            <artifactId>osmosis-tagfilter</artifactId>
+            <version>0.49.2</version>
         </dependency>
 
         <!-- Allure Dependencies -->
@@ -101,8 +145,8 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.11.0</version>
                 <configuration>
-                    <source>${maven.compiler.source}</source>
-                    <target>${maven.compiler.target}</target>
+                    <source>17</source>
+                    <target>17</target>
                 </configuration>
             </plugin>
 
@@ -115,6 +159,7 @@
                     <testFailureIgnore>true</testFailureIgnore>
                     <parallel>methods</parallel>
                     <threadCount>3</threadCount>
+                    <perCoreThreadCount>false</perCoreThreadCount>
                     <forkCount>3</forkCount>
                     <reuseForks>true</reuseForks>
                     <argLine>
@@ -129,6 +174,13 @@
                         <include>**/runner/*TestRunner*.java</include>
                     </includes>
                 </configuration>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.aspectj</groupId>
+                        <artifactId>aspectjweaver</artifactId>
+                        <version>${aspectj.version}</version>
+                    </dependency>
+                </dependencies>
             </plugin>
 
             <!-- Allure Plugin -->
@@ -141,6 +193,34 @@
                     <resultsDirectory>${project.build.directory}/allure-results</resultsDirectory>
                     <reportDirectory>${project.build.directory}/allure-reports</reportDirectory>
                 </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-checkstyle-plugin</artifactId>
+                <version>3.3.1</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>com.puppycrawl.tools</groupId>
+                        <artifactId>checkstyle</artifactId>
+                        <version>10.12.5</version>
+                    </dependency>
+                </dependencies>
+                <configuration>
+                    <configLocation>.gitlab/google_checks.xml</configLocation>
+                    <consoleOutput>false</consoleOutput>
+                    <failsOnError>true</failsOnError>
+                    <failOnViolation>true</failOnViolation>
+                    <violationSeverity>warning</violationSeverity>
+                    <includeTestSourceDirectory>true</includeTestSourceDirectory>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
