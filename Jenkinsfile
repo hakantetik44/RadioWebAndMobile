@@ -4,7 +4,7 @@ pipeline {
     tools {
         maven 'maven' // Jenkins üzerinde tanımlı Maven
         jdk 'JDK17' // Jenkins üzerinde tanımlı olan JDK17
-        allure 'Allure' // Jenkins üzerinde tanımlı Allure
+        allure 'Allure' // Jenkins üzerinde tanımlı olan Allure
     }
 
     environment {
@@ -55,7 +55,7 @@ pipeline {
 
         stage('Build & Dependencies') {
             steps {
-                sh "${M2_HOME}/bin/mvn clean install -DskipTests || { echo 'Build failed'; exit 1; }"
+                sh "${M2_HOME}/bin/mvn clean install -DskipTests"
             }
         }
 
@@ -71,8 +71,13 @@ pipeline {
                                 -Dcucumber.plugin="pretty,json:target/cucumber.json,io.qameta.allure.cucumber7jvm.AllureCucumber7Jvm" \
                                 -Dwebdriver.chrome.headless=true \
                                 -Dwebdriver.chrome.args="--headless,--disable-gpu,--window-size=1920,1080" \
-                                | tee execution.log || { echo "Maven test failed"; currentBuild.result = 'FAILURE'; exit 1; }
+                                | tee execution.log
                             """
+                        }
+                        // Sonuç kontrolü ekle
+                        if (currentBuild.result != 'SUCCESS') {
+                            currentBuild.result = 'FAILURE'
+                            error("Tests did not complete successfully!")
                         }
                     } catch (Exception e) {
                         currentBuild.result = 'FAILURE'
@@ -86,23 +91,24 @@ pipeline {
         stage('Generate Reports') {
             steps {
                 script {
-                    try {
-                        sh "${M2_HOME}/bin/mvn verify -DskipTests || { echo 'Report generation failed'; exit 1; }"
-                        allure([
-                            includeProperties: false,
-                            jdk: '',
-                            properties: [],
-                            reportBuildPolicy: 'ALWAYS',
-                            results: [[path: ALLURE_RESULTS]]
-                        ])
+                    sh """
+                        ${M2_HOME}/bin/mvn verify -DskipTests
+                        mkdir -p ${CUCUMBER_REPORTS}
+                    """
 
-                        // HTML raporunu PDF'ye dönüştür
-                        echo "\033[0;34mGenerating PDF Report...\033[0m"
-                        sh "wkhtmltopdf ${BUILD_URL}cucumber-html-reports/overview-features.html ${PDF_REPORT} || { echo 'PDF report generation failed'; exit 1; }"
-                    } catch (Exception e) {
-                        currentBuild.result = 'FAILURE'
-                        echo "Error in report generation: ${e.message}"
-                    }
+                    allure([
+                        includeProperties: false,
+                        jdk: '',
+                        properties: [],
+                        reportBuildPolicy: 'ALWAYS',
+                        results: [[path: ALLURE_RESULTS]]
+                    ])
+
+                    // HTML raporunu PDF'ye dönüştür
+                    echo "\033[0;34mGenerating PDF Report...\033[0m"
+                    sh """
+                        wkhtmltopdf ${BUILD_URL}cucumber-html-reports/overview-features.html ${PDF_REPORT}
+                    """
                 }
             }
             post {
@@ -147,6 +153,7 @@ pipeline {
 
                     ${currentBuild.result == 'SUCCESS' ? '✅ SUCCESS' : '❌ FAILED'}
                 """
+                echo "\033[0;31mCurrent Build Result: ${currentBuild.result}\033[0m" // Eklenen log
             }
             cleanWs()
         }
