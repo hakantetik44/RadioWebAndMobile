@@ -1,7 +1,7 @@
 <module name="Checker">
     <module name="TreeWalker">
         <module name="FileTabCharacter">
-            <property name="file" value="src/main/resources/google_checks.xml"/>
+            <property name="file" value="src/main/resources/google_checks.xml"/> <!-- Yolunu güncelleyin -->
         </module>
     </module>
 </module>
