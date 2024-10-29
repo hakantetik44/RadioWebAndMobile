@@ -4,7 +4,7 @@ pipeline {
     tools {
         maven 'maven' // Jenkins içinde tanımlı Maven
         jdk 'JDK17' // Jenkins üzerinde tanımlı olan JDK17
-        allure 'Allure' // Jenkins üzerinde tanımlı Allure
+        // allure 'Allure' // Bu satırı kaldırın, çünkü hata veriyor
     }
 
     environment {
