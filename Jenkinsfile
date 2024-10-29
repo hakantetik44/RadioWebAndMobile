@@ -126,9 +126,7 @@ pipeline {
                     - Allure Report: ${BUILD_URL}allure/
                     - PDF Report: ${BUILD_URL}${PDF_REPORT}
 
-                    ${currentBuild.result == 'SUCCESS' ? '✅ SUCCESS' : '❌ FAILED'}
-                """
-                echo "Current Build Result: ${currentBuild.result}"
+
             }
             cleanWs()
         }
