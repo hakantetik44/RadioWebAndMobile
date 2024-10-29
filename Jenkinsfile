@@ -4,13 +4,13 @@ pipeline {
     tools {
         maven 'maven' // Jenkins içinde tanımlı Maven
         jdk 'JDK17' // Jenkins üzerinde tanımlı olan JDK17
+        allure 'Allure' // Jenkins üzerinde tanımlı Allure
     }
 
     environment {
-        // JAVA_HOME dizini, sisteminizdeki doğru Java dizinine ayarlandı
-        JAVA_HOME = "/usr/local/opt/openjdk@17" // Güncellenmiş JAVA_HOME
-        M2_HOME = tool 'maven' // Maven'ı Jenkins'ten al
-        PATH = "${JAVA_HOME}/bin:${M2_HOME}/bin:${PATH}" // Doğru PATH ayarı
+        JAVA_HOME = "/usr/local/opt/openjdk@17"
+        M2_HOME = tool 'maven'
+        PATH = "${JAVA_HOME}/bin:${M2_HOME}/bin:${PATH}"
         MAVEN_OPTS = '-Xmx3072m'
         PROJECT_NAME = 'Radio BDD Automation Tests'
         TIMESTAMP = new Date().format('yyyy-MM-dd_HH-mm-ss')
@@ -31,7 +31,6 @@ pipeline {
                 cleanWs()
                 checkout scm
 
-                // Java ve Maven versiyonlarını kontrol etme
                 sh '''
                     echo "JAVA_HOME = ${JAVA_HOME}"
                     echo "M2_HOME = ${M2_HOME}"
@@ -68,7 +67,6 @@ pipeline {
                             sh """
                                 ${M2_HOME}/bin/mvn test \
                                 -Dtest=runner.TestRunner \
-                                -Dcucumber.plugin="pretty,json:target/cucumber.json,io.qameta.allure.cucumber7jvm.AllureCucumber7Jvm" \
                                 | tee execution.log
                             """
                         }
@@ -83,7 +81,6 @@ pipeline {
         stage('Generate Reports') {
             steps {
                 script {
-                    // Allure raporlarını oluşturmak için gerekli komutlar
                     sh """
                         ${M2_HOME}/bin/mvn verify -DskipTests
                         mkdir -p ${CUCUMBER_REPORTS}
