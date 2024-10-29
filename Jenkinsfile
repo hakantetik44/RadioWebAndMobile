@@ -61,7 +61,20 @@ pipeline {
                         -Dcucumber.plugin="pretty,json:target/cucumber.json,io.qameta.allure.cucumber7jvm.AllureCucumber7Jvm" \
                         -Dwebdriver.chrome.headless=true \
                         -Dwebdriver.chrome.args="--headless,--disable-gpu,--window-size=1920,1080" \
-                        | tee execution.log
+                        | tee test-output.txt
+
+                        # Test sonuçlarını formatla
+                        cat test-output.txt | while IFS= read -r line; do
+                            if [[ \$line == *"Given"* ]] || [[ \$line == *"When"* ]] || [[ \$line == *"Then"* ]] || [[ \$line == *"And"* ]]; then
+                                echo "✅ \$line" >> execution.log
+                            elif [[ \$line == *"pop-up not found"* ]] || [[ \$line == *"already closed"* ]] || [[ \$line == *"already declined"* ]] || [[ \$line == *"already accepted"* ]]; then
+                                echo "ℹ️ \$line" >> execution.log
+                            elif [[ \$line == *"expectedUrl"* ]] || [[ \$line == *"actualUrl"* ]]; then
+                                echo "🔍 \$line" >> execution.log
+                            else
+                                echo "\$line" >> execution.log
+                            fi
+                        done
                     """
                 }
             }
@@ -75,7 +88,6 @@ pipeline {
                         ${M2_HOME}/bin/mvn verify -DskipTests
                     """
 
-                    // Allure raporu oluştur
                     allure([
                         includeProperties: false,
                         jdk: '',
@@ -123,18 +135,34 @@ pipeline {
                     - Cucumber Report: ${BUILD_URL}cucumber-html-reports/overview-features.html
                     - Allure Report: ${BUILD_URL}allure/
 
-                    ✅ SUCCESS
+                    ✅ Tests Completed Successfully!
+
+                    Test Steps Summary:
+                    ==================
+                    ✅ Given/When/Then/And steps completed
+                    ℹ️ Informational messages (pop-ups, cookies)
+                    🔍 URL verifications
                 """
             }
         }
         failure {
-            echo """
-                ╔══════════════════════════════════╗
-                ║       Test Execution Failed      ║
-                ╚══════════════════════════════════╝
+            script {
+                def testResults = ""
+                if (fileExists('execution.log')) {
+                    testResults = readFile('execution.log').trim()
+                }
 
-                ❌ FAILED: Check the logs for details
-            """
+                echo """
+                    ╔══════════════════════════════════╗
+                    ║       Test Execution Failed      ║
+                    ╚══════════════════════════════════╝
+
+                    📊 Test Results:
+                    ${testResults}
+
+                    ❌ FAILED: Check the logs for details
+                """
+            }
         }
         always {
             cleanWs()
