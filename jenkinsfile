@@ -1,4 +1,3 @@
-
 pipeline {
     agent any
 
@@ -24,14 +23,8 @@ pipeline {
                         ╔══════════════════════════════════╗
                         ║      Test Automation Start       ║
                         ╚══════════════════════════════════╝
-
-                        🚀 Framework: Cucumber BDD
-                        📱 Platforms: Web & Mobile
-                        🔧 Build Tool: Maven
                     """
                 }
-
-                // Clean workspace and checkout code
                 cleanWs()
                 checkout scm
             }
@@ -39,15 +32,6 @@ pipeline {
 
         stage('Build & Dependencies') {
             steps {
-                script {
-                    echo """
-                        ╔══════════════════════════════════╗
-                        ║    Installing Dependencies       ║
-                        ╚══════════════════════════════════╝
-                    """
-                }
-
-                // Clean install with checkstyle verification
                 sh """
                     mvn clean install -DskipTests
                     mvn checkstyle:check
@@ -55,49 +39,64 @@ pipeline {
             }
         }
 
-        stage('Test Execution') {
+        stage('Run Web Tests') {
             steps {
                 script {
                     try {
-                        echo """
-                            ╔══════════════════════════════════╗
-                            ║        Running Tests             ║
-                            ╚══════════════════════════════════╝
-                        """
-
-                        // Run tests with parallel execution
+                        echo "🌐 Running Web Tests..."
                         sh """
                             mvn test \
-                            -Dmaven.test.failure.ignore=true \
-                            -Dparallel=methods \
-                            -DthreadCount=3 \
-                            -Dcucumber.filter.tags="@web or @mobile" \
-                            -Dcucumber.plugin="json:target/cucumber.json,html:target/cucumber-reports/html" \
-                            | tee execution.log
+                            -Dtest=WebTestRunner \
+                            -Dcucumber.filter.tags="@web" \
+                            -Dcucumber.plugin="json:target/cucumber-web.json,html:target/cucumber-reports/web" \
+                            | tee web-execution.log
                         """
-
-                        // Generate Cucumber Reports
-                        sh 'mvn verify -DskipTests'
-
                     } catch (Exception e) {
                         currentBuild.result = 'FAILURE'
                         throw e
                     }
                 }
             }
+        }
+
+        stage('Run Mobile Tests') {
+            steps {
+                script {
+                    try {
+                        echo "📱 Running Mobile Tests..."
+                        sh """
+                            mvn test \
+                            -Dtest=MobileTestRunner \
+                            -Dcucumber.filter.tags="@mobile" \
+                            -Dcucumber.plugin="json:target/cucumber-mobile.json,html:target/cucumber-reports/mobile" \
+                            | tee mobile-execution.log
+                        """
+                    } catch (Exception e) {
+                        currentBuild.result = 'FAILURE'
+                        throw e
+                    }
+                }
+            }
+        }
+
+        stage('Generate Reports') {
+            steps {
+                sh """
+                    mvn verify -DskipTests
+                    mkdir -p ${CUCUMBER_REPORTS}
+                """
+            }
             post {
                 always {
-                    // Archive test results and reports
                     archiveArtifacts artifacts: """
                         target/cucumber-reports/**/*,
-                        target/cucumber.json,
+                        target/cucumber*.json,
                         target/screenshots/**/*,
-                        execution.log
+                        *execution.log
                     """, allowEmptyArchive: true
 
-                    // Publish test results
                     cucumber buildStatus: 'UNSTABLE',
-                            fileIncludePattern: '**/cucumber.json',
+                            fileIncludePattern: '**/cucumber*.json',
                             jsonReportDirectory: 'target'
                 }
             }
@@ -108,8 +107,8 @@ pipeline {
         always {
             script {
                 def testResults = ""
-                if (fileExists('execution.log')) {
-                    testResults = readFile('execution.log').trim()
+                if (fileExists('*execution.log')) {
+                    testResults = readFile('*execution.log').trim()
                 }
 
                 echo """
@@ -117,36 +116,13 @@ pipeline {
                     ║       Test Execution Summary     ║
                     ╚══════════════════════════════════╝
 
-                    🏷️ Project: ${PROJECT_NAME}
-                    ⏱️ Completed: ${new Date().format('dd/MM/yyyy HH:mm:ss')}
-                    👤 Triggered by: ${GIT_AUTHOR}
-                    📝 Commit message: ${GIT_COMMIT_MSG}
-
                     📊 Test Results:
-                    ===============
                     ${testResults}
 
-                    📋 Reports:
-                    - Cucumber HTML Report: ${WORKSPACE}/target/cucumber-reports/html/index.html
-                    - JSON Report: ${WORKSPACE}/target/cucumber.json
-
-                    ${currentBuild.result == 'SUCCESS' ? '✅ Build Status: SUCCESS' : '❌ Build Status: FAILED'}
+                    ${currentBuild.result == 'SUCCESS' ? '✅ SUCCESS' : '❌ FAILED'}
                 """
             }
-            // Cleanup workspace
             cleanWs()
-        }
-        success {
-            echo """
-                ✨ Test execution completed successfully!
-                🔍 Check the Cucumber reports for detailed results.
-            """
-        }
-        failure {
-            echo """
-                ❌ Test execution failed!
-                🔍 Please check the logs and reports for details.
-            """
         }
     }
 }
