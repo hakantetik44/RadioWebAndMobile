@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     tools {
-        maven 'maven' // Jenkins içinde tanımlı Maven
+        maven 'maven' // Jenkins üzerinde tanımlı Maven
         jdk 'JDK17' // Jenkins üzerinde tanımlı olan JDK17
         allure 'Allure' // Jenkins üzerinde tanımlı Allure
     }
