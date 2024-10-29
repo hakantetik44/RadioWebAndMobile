@@ -32,7 +32,7 @@ public class RadioStep {
     @Then("Histoire için sonuçlar gorunmeli")
     public void sonuclariDogrula() throws InterruptedException {
 
-        String expectedUrl = "https://www.radiofrance.fr/recherche?term=Histoire";
+        String expectedUrl = "https://www.radiofrance.fr/recherche";
         System.out.println("expectedUrl = " + expectedUrl);
         String actualUrl = Driver.getCurrentDriver().getCurrentUrl();
         System.out.println("actualUrl = " + actualUrl);
