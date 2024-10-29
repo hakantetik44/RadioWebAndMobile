@@ -10,7 +10,7 @@ pipeline {
         JAVA_HOME = '/usr/local/opt/openjdk@17'
         M2_HOME = tool 'maven'
         PATH = "${JAVA_HOME}/bin:${M2_HOME}/bin:${PATH}"
-        MAVEN_OPTS = '-Xmx3072m'  // MaxPermSize kaldırıldı
+        MAVEN_OPTS = '-Xmx3072m'  // MaxPermSize removed
         PROJECT_NAME = 'Radio BDD Automations Tests'
         TIMESTAMP = new Date().format('yyyy-MM-dd_HH-mm-ss')
         CUCUMBER_REPORTS = 'target/cucumber-reports'
@@ -31,7 +31,6 @@ pipeline {
                 checkout scm
 
                 sh '''
-                    export JAVA_HOME=/usr/local/opt/openjdk@17
                     echo "JAVA_HOME = ${JAVA_HOME}"
                     echo "M2_HOME = ${M2_HOME}"
                     java -version
@@ -43,9 +42,8 @@ pipeline {
         stage('Build & Dependencies') {
             steps {
                 sh """
-                    export JAVA_HOME=/usr/local/opt/openjdk@17
                     ${M2_HOME}/bin/mvn clean install -DskipTests
-                    # Checkstyle kontrolü kaldırıldı
+                    // Checkstyle verification removed
                 """
             }
         }
@@ -56,7 +54,6 @@ pipeline {
                     try {
                         echo "🚀 Running Tests..."
                         sh """
-                            export JAVA_HOME=/usr/local/opt/openjdk@17
                             ${M2_HOME}/bin/mvn test \
                             -Dtest=runner.TestRunner \
                             -Dcucumber.plugin="pretty,json:target/cucumber.json,utils.formatter.PrettyReports:target/cucumber-pretty-reports,io.qameta.allure.cucumber7jvm.AllureCucumber7Jvm" \
@@ -73,29 +70,28 @@ pipeline {
         stage('Generate Reports') {
             steps {
                 script {
-                    // Cucumber Reports
+                    // Generate Cucumber Reports
                     sh """
-                        export JAVA_HOME=/usr/local/opt/openjdk@17
                         ${M2_HOME}/bin/mvn verify -DskipTests
                         mkdir -p ${CUCUMBER_REPORTS}
                     """
 
-                    // Allure Report
+                    // Generate Allure Report
                     allure([
                         includeProperties: false,
                         jdk: '',
                         properties: [],
                         reportBuildPolicy: 'ALWAYS',
-                        results: [[path: 'target/allure-results']]
+                        results: [[path: ALLURE_RESULTS]]
                     ])
                 }
             }
             post {
                 always {
                     archiveArtifacts artifacts: """
-                        target/cucumber-pretty-reports/**/*,
+                        ${CUCUMBER_REPORTS}/**/*,
                         target/cucumber.json,
-                        target/allure-results/**/*,
+                        ${ALLURE_RESULTS}/**/*,
                         target/screenshots/**/*,
                         execution.log
                     """, allowEmptyArchive: true
