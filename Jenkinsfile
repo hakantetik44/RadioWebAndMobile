@@ -7,10 +7,10 @@ pipeline {
     }
 
     environment {
-        JAVA_HOME = '/usr/local/opt/openjdk@17'
+        JAVA_HOME = '/usr/local/opt/openjdk@17'  // JAVA_HOME doğru ayarlandı
         M2_HOME = tool 'maven'
         PATH = "${JAVA_HOME}/bin:${M2_HOME}/bin:${PATH}"
-        MAVEN_OPTS = '-Xmx3072m'
+        MAVEN_OPTS = '-Xmx3072m'  // MaxPermSize kaldırıldı
         PROJECT_NAME = 'Radio BDD Automations Tests'
         TIMESTAMP = new Date().format('yyyy-MM-dd_HH-mm-ss')
         CUCUMBER_REPORTS = 'target/cucumber-reports'
@@ -30,6 +30,7 @@ pipeline {
                 cleanWs()
                 checkout scm
 
+                // JAVA_HOME ve M2_HOME kontrolü
                 sh '''
                     echo "JAVA_HOME = ${JAVA_HOME}"
                     echo "M2_HOME = ${M2_HOME}"
@@ -41,7 +42,9 @@ pipeline {
 
         stage('Build & Dependencies') {
             steps {
-                sh "${M2_HOME}/bin/mvn clean install -DskipTests"
+                sh """
+                    ${M2_HOME}/bin/mvn clean install -DskipTests
+                """
             }
         }
 
@@ -50,14 +53,12 @@ pipeline {
                 script {
                     try {
                         echo "🚀 Running Tests..."
-                        withEnv(["JAVA_HOME=${JAVA_HOME}"]) {
-                            sh """
-                                ${M2_HOME}/bin/mvn test \
-                                -Dtest=runner.TestRunner \
-                                -Dcucumber.plugin="pretty,json:target/cucumber.json,utils.formatter.PrettyReports:target/cucumber-pretty-reports,io.qameta.allure.cucumber7jvm.AllureCucumber7Jvm" \
-                                | tee execution.log
-                            """
-                        }
+                        sh """
+                            ${M2_HOME}/bin/mvn test \
+                            -Dtest=runner.TestRunner \
+                            -Dcucumber.plugin="pretty,json:target/cucumber.json,io.qameta.allure.cucumber7jvm.AllureCucumber7Jvm" \
+                            | tee execution.log
+                        """
                     } catch (Exception e) {
                         currentBuild.result = 'FAILURE'
                         throw e
@@ -69,26 +70,28 @@ pipeline {
         stage('Generate Reports') {
             steps {
                 script {
+                    // Cucumber Reports
                     sh """
                         ${M2_HOME}/bin/mvn verify -DskipTests
                         mkdir -p ${CUCUMBER_REPORTS}
                     """
 
+                    // Allure Report
                     allure([
                         includeProperties: false,
                         jdk: '',
                         properties: [],
                         reportBuildPolicy: 'ALWAYS',
-                        results: [[path: ALLURE_RESULTS]]
+                        results: [[path: 'target/allure-results']]
                     ])
                 }
             }
             post {
                 always {
                     archiveArtifacts artifacts: """
-                        ${CUCUMBER_REPORTS}/**/*,
+                        target/cucumber-pretty-reports/**/*,
                         target/cucumber.json,
-                        ${ALLURE_RESULTS}/**/*,
+                        target/allure-results/**/*,
                         target/screenshots/**/*,
                         execution.log
                     """, allowEmptyArchive: true
