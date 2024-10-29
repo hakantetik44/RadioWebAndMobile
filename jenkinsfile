@@ -8,44 +8,50 @@ pipeline {
     }
 
     environment {
-        REPORT_DIR = "target/cucumber-reports"
+        MAVEN_OPTS = '-Xmx3072m -XX:MaxPermSize=512m'
+        PROJECT_NAME = 'Radio BDD Automations Tests'
         TIMESTAMP = new Date().format('yyyy-MM-dd_HH-mm-ss')
+        CUCUMBER_REPORTS = 'target/cucumber-reports'
         GIT_COMMIT_MSG = sh(script: 'git log -1 --pretty=%B', returnStdout: true).trim()
         GIT_AUTHOR = sh(script: 'git log -1 --pretty=%an', returnStdout: true).trim()
     }
 
     stages {
-        stage('Setup') {
+        stage('Initialize') {
             steps {
                 script {
                     echo """
                         ╔══════════════════════════════════╗
-                        ║        Test Automation Start     ║
+                        ║      Test Automation Start       ║
                         ╚══════════════════════════════════╝
 
-                        🚀 Initializing test environment...
+                        🚀 Framework: Cucumber BDD
+                        📱 Platforms: Web & Mobile
+                        🔧 Build Tool: Maven
                     """
                 }
 
+                // Clean workspace and checkout code
+                cleanWs()
                 checkout scm
-
-                sh """
-                    mkdir -p ${REPORT_DIR}/{html,json,screenshots}
-                """
             }
         }
 
-        stage('Build') {
+        stage('Build & Dependencies') {
             steps {
                 script {
                     echo """
                         ╔══════════════════════════════════╗
-                        ║        Building Project          ║
+                        ║    Installing Dependencies       ║
                         ╚══════════════════════════════════╝
                     """
                 }
 
-                sh 'mvn clean install -DskipTests'
+                // Clean install with checkstyle verification
+                sh """
+                    mvn clean install -DskipTests
+                    mvn checkstyle:check
+                """
             }
         }
 
@@ -59,113 +65,19 @@ pipeline {
                             ╚══════════════════════════════════╝
                         """
 
-                        // Web Tests
+                        // Run tests with parallel execution
                         sh """
-                            echo "🌐 Running Web Tests..."
-                            mvn test -Dcucumber.filter.tags="@web" \
-                                -Dbrowser=chrome \
-                                -Dheadless=true \
-                                | tee test-output.txt
+                            mvn test \
+                            -Dmaven.test.failure.ignore=true \
+                            -Dparallel=methods \
+                            -DthreadCount=3 \
+                            -Dcucumber.filter.tags="@web or @mobile" \
+                            -Dcucumber.plugin="json:target/cucumber.json,html:target/cucumber-reports/html" \
+                            | tee execution.log
                         """
 
-                        // Mobile Tests
-                        sh """
-                            echo "📱 Running Mobile Tests..."
-                            mvn test -Dcucumber.filter.tags="@mobile" \
-                                -DplatformName=Android \
-                                -DdeviceName=emulator-5554 \
-                                | tee -a test-output.txt
-                        """
-
-                        // Generate Reports
-                        sh """
-                            echo "📊 Generating Reports..."
-                            mvn cluecumber-report:reporting
-                        """
-
-                        // Create PDF Report
-                        writeFile file: 'createReport.js', text: '''
-                            const fs = require('fs');
-                            const { jsPDF } = require('jspdf');
-
-                            try {
-                                const report = JSON.parse(fs.readFileSync('target/cucumber-reports/cucumber.json', 'utf8'));
-                                const doc = new jsPDF();
-
-                                // Header
-                                doc.setFillColor(0, 57, 166);
-                                doc.rect(0, 0, 210, 40, 'F');
-
-                                doc.setTextColor(255, 255, 255);
-                                doc.setFontSize(24);
-                                doc.text("Test Execution Report", 15, 25);
-
-                                // Date
-                                doc.setFontSize(14);
-                                doc.text(new Date().toLocaleString(), 15, 35);
-
-                                // Summary Section
-                                doc.setFillColor(247, 247, 247);
-                                doc.rect(0, 45, 210, 70, 'F');
-
-                                doc.setTextColor(0, 0, 0);
-                                doc.setFontSize(18);
-                                doc.text("Test Summary", 15, 60);
-
-                                // Test Statistics
-                                doc.setFontSize(12);
-                                const stats = [
-                                    `Total Scenarios: ${report.length}`,
-                                    `Passed: ${report.filter(s => s.status === 'passed').length}`,
-                                    `Failed: ${report.filter(s => s.status === 'failed').length}`,
-                                    `Skipped: ${report.filter(s => s.status === 'skipped').length}`,
-                                    `Duration: ${(report.reduce((acc, curr) => acc + curr.duration, 0) / 1000000000).toFixed(2)}s`
-                                ];
-
-                                stats.forEach((text, index) => {
-                                    doc.text(text, 20, 80 + (index * 10));
-                                });
-
-                                // Details Section
-                                let yPos = 130;
-                                doc.setFontSize(18);
-                                doc.text("Test Details", 15, yPos);
-
-                                yPos += 20;
-                                report.forEach(scenario => {
-                                    // Scenario box
-                                    doc.setFillColor(255, 255, 255);
-                                    doc.rect(15, yPos - 5, 180, 25, 'F');
-                                    doc.setDrawColor(220, 220, 220);
-                                    doc.rect(15, yPos - 5, 180, 25, 'D');
-
-                                    // Scenario details
-                                    doc.setFontSize(11);
-                                    const icon = scenario.status === 'passed' ? '✓' : '✗';
-                                    const color = scenario.status === 'passed' ? [46, 184, 46] : [220, 53, 69];
-
-                                    doc.setTextColor(...color);
-                                    doc.text(icon, 20, yPos + 5);
-
-                                    doc.setTextColor(0, 0, 0);
-                                    doc.text(scenario.name, 30, yPos + 5);
-                                    doc.text(`Duration: ${(scenario.duration / 1000000000).toFixed(2)}s`, 30, yPos + 15);
-
-                                    yPos += 30;
-                                    if (yPos > 250) {
-                                        doc.addPage();
-                                        yPos = 30;
-                                    }
-                                });
-
-                                doc.save(`${process.env.REPORT_DIR}/report_${process.env.TIMESTAMP}.pdf`);
-                            } catch (err) {
-                                console.error('Error generating PDF report:', err);
-                                process.exit(1);
-                            }
-                        '''
-
-                        sh 'node createReport.js'
+                        // Generate Cucumber Reports
+                        sh 'mvn verify -DskipTests'
 
                     } catch (Exception e) {
                         currentBuild.result = 'FAILURE'
@@ -173,113 +85,68 @@ pipeline {
                     }
                 }
             }
+            post {
+                always {
+                    // Archive test results and reports
+                    archiveArtifacts artifacts: """
+                        target/cucumber-reports/**/*,
+                        target/cucumber.json,
+                        target/screenshots/**/*,
+                        execution.log
+                    """, allowEmptyArchive: true
+
+                    // Publish test results
+                    cucumber buildStatus: 'UNSTABLE',
+                            fileIncludePattern: '**/cucumber.json',
+                            jsonReportDirectory: 'target'
+                }
+            }
         }
     }
 
     post {
         always {
-            archiveArtifacts artifacts: """
-                ${REPORT_DIR}/**/*,
-                target/screenshots/**/*,
-                test-output.txt
-            """, allowEmptyArchive: true
+            script {
+                def testResults = ""
+                if (fileExists('execution.log')) {
+                    testResults = readFile('execution.log').trim()
+                }
+
+                echo """
+                    ╔══════════════════════════════════╗
+                    ║       Test Execution Summary     ║
+                    ╚══════════════════════════════════╝
+
+                    🏷️ Project: ${PROJECT_NAME}
+                    ⏱️ Completed: ${new Date().format('dd/MM/yyyy HH:mm:ss')}
+                    👤 Triggered by: ${GIT_AUTHOR}
+                    📝 Commit message: ${GIT_COMMIT_MSG}
+
+                    📊 Test Results:
+                    ===============
+                    ${testResults}
+
+                    📋 Reports:
+                    - Cucumber HTML Report: ${WORKSPACE}/target/cucumber-reports/html/index.html
+                    - JSON Report: ${WORKSPACE}/target/cucumber.json
+
+                    ${currentBuild.result == 'SUCCESS' ? '✅ Build Status: SUCCESS' : '❌ Build Status: FAILED'}
+                """
+            }
+            // Cleanup workspace
+            cleanWs()
         }
         success {
-            script {
-                def testOutput = readFile('test-output.txt').trim()
-                echo """
-                    ╔══════════════════════════════════╗
-                    ║         Test Execution           ║
-                    ╚══════════════════════════════════╝
-
-                    ✅ Status: SUCCESS
-                    ⏱️ Finished: ${new Date().format('dd/MM/yyyy HH:mm:ss')}
-
-                    📝 Results:
-                    ${testOutput}
-
-                    📊 Reports:
-                    - Cucumber HTML: ${REPORT_DIR}/html/index.html
-                    - PDF Report: ${REPORT_DIR}/report_${TIMESTAMP}.pdf
-                """
-            }
+            echo """
+                ✨ Test execution completed successfully!
+                🔍 Check the Cucumber reports for detailed results.
+            """
         }
         failure {
-            script {
-                def testOutput = readFile('test-output.txt').trim()
-                echo """
-                    ╔══════════════════════════════════╗
-                    ║         Test Execution           ║
-                    ╚══════════════════════════════════╝
-
-                    ❌ Status: FAILED
-                    ⏱️ Finished: ${new Date().format('dd/MM/yyyy HH:mm:ss')}
-
-                    📝 Results:
-                    ${testOutput}
-
-                    📊 Reports:
-                    - Cucumber HTML: ${REPORT_DIR}/html/index.html
-                    - PDF Report: ${REPORT_DIR}/report_${TIMESTAMP}.pdf
-                """
-            }
-        }
-        cleanup {
-            cleanWs()
+            echo """
+                ❌ Test execution failed!
+                🔍 Please check the logs and reports for details.
+            """
         }
     }
 }
-```
-
-Bu pipeline:
-
-1. Java ve Maven araçlarını kullanıyor
-2. Web ve mobil testleri ayrı ayrı çalıştırıyor
-3. Cucumber raporları oluşturuyor
-4. PDF rapor oluşturuyor
-5. Test sonuçlarını arşivliyor
-
-Projenizin `pom.xml` dosyasında şu plugin'lerin olması gerekiyor:
-
-```xml
-<build>
-    <plugins>
-        <!-- Maven Surefire Plugin -->
-        <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-surefire-plugin</artifactId>
-            <version>3.2.2</version>
-            <configuration>
-                <systemPropertyVariables>
-                    <cucumber.filter.tags>${cucumber.filter.tags}</cucumber.filter.tags>
-                    <browser>${browser}</browser>
-                    <headless>${headless}</headless>
-                    <platformName>${platformName}</platformName>
-                    <deviceName>${deviceName}</deviceName>
-                </systemPropertyVariables>
-            </configuration>
-        </plugin>
-
-        <!-- Cucumber Reporting Plugin -->
-        <plugin>
-            <groupId>com.trivago.rta</groupId>
-            <artifactId>cluecumber-report-plugin</artifactId>
-            <version>2.9.4</version>
-            <executions>
-                <execution>
-                    <id>report</id>
-                    <phase>post-integration-test</phase>
-                    <goals>
-                        <goal>reporting</goal>
-                    </goals>
-                </execution>
-            </executions>
-            <configuration>
-                <sourceJsonReportDirectory>${project.build.directory}/cucumber-reports</sourceJsonReportDirectory>
-                <generatedHtmlReportDirectory>${project.build.directory}/cucumber-reports/html</generatedHtmlReportDirectory>
-            </configuration>
-        </plugin>
-    </plugins>
-</build>
-
-
