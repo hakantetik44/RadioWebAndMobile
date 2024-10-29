@@ -2,11 +2,13 @@ pipeline {
     agent any
 
     tools {
-        maven 'maven'
-        jdk 'jdk 17'
+        maven 'MAVEN3'
+        jdk 'JDK17'
     }
 
     environment {
+        JAVA_HOME = tool 'JDK17'
+        PATH = "${JAVA_HOME}/bin:${PATH}"
         MAVEN_OPTS = '-Xmx3072m -XX:MaxPermSize=512m'
         PROJECT_NAME = 'Radio BDD Automations Tests'
         TIMESTAMP = new Date().format('yyyy-MM-dd_HH-mm-ss')
@@ -25,6 +27,13 @@ pipeline {
                 }
                 cleanWs()
                 checkout scm
+
+                // Environment Check
+                sh '''
+                    echo "JAVA_HOME = ${JAVA_HOME}"
+                    java -version
+                    mvn -version
+                '''
             }
         }
 
