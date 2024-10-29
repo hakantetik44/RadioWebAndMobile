@@ -2,15 +2,15 @@ pipeline {
     agent any
 
     tools {
-        maven 'maven'
-        jdk 'JDK17'  // Jenkins üzerinde tanımlı olan JDK17
+        maven 'maven' // Jenkins içinde tanımlı Maven
+        jdk 'openjdk@17' // Jenkins üzerinde tanımlı olan JDK17
     }
 
     environment {
         // JAVA_HOME dizini, sisteminizdeki doğru Java dizinine ayarlandı
-        JAVA_HOME = "/Users/hakan/Library/Java/JavaVirtualMachines/corretto-17.0.12/Contents/Home"
-        M2_HOME = tool 'maven'
-        PATH = "${JAVA_HOME}/bin:${M2_HOME}/bin:${PATH}"
+        JAVA_HOME = "/usr/local/opt/openjdk@17" // Güncellenmiş JAVA_HOME
+        M2_HOME = tool 'maven' // Maven'ı Jenkins'ten al
+        PATH = "${JAVA_HOME}/bin:${M2_HOME}/bin:${PATH}" // Doğru PATH ayarı
         MAVEN_OPTS = '-Xmx3072m'
         PROJECT_NAME = 'Radio BDD Automation Tests'
         TIMESTAMP = new Date().format('yyyy-MM-dd_HH-mm-ss')
@@ -31,11 +31,23 @@ pipeline {
                 cleanWs()
                 checkout scm
 
+                // Java ve Maven versiyonlarını kontrol etme
                 sh '''
                     echo "JAVA_HOME = ${JAVA_HOME}"
                     echo "M2_HOME = ${M2_HOME}"
                     echo "PATH = ${PATH}"
-                    java -version || { echo "Java is not available!"; exit 1; }
+
+                    if [ -z "$JAVA_HOME" ]; then
+                        echo "JAVA_HOME is not set!"
+                        exit 1
+                    fi
+
+                    if [ ! -x "${JAVA_HOME}/bin/java" ]; then
+                        echo "Java is not available in JAVA_HOME!"
+                        exit 1
+                    fi
+
+                    java -version
                     mvn -version || { echo "Maven is not available!"; exit 1; }
                 '''
             }
