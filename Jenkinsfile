@@ -7,9 +7,9 @@ pipeline {
     }
 
     environment {
-        JAVA_HOME = "${tool 'JDK17'}/bin"
+        JAVA_HOME = "${tool 'JDK17'}"
         M2_HOME = tool 'maven'
-        PATH = "${JAVA_HOME}:${M2_HOME}/bin:${PATH}"
+        PATH = "${JAVA_HOME}/bin:${M2_HOME}/bin:${PATH}"
         MAVEN_OPTS = '-Xmx3072m'
         PROJECT_NAME = 'Radio BDD Automation Tests'
         TIMESTAMP = new Date().format('yyyy-MM-dd_HH-mm-ss')
