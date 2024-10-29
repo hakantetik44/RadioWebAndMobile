@@ -7,13 +7,14 @@ pipeline {
     }
 
     environment {
-        JAVA_HOME = '/usr/local/opt/openjdk@17'  // MacOS için doğru path
+        JAVA_HOME = '/usr/local/opt/openjdk@17'
         M2_HOME = tool 'maven'
         PATH = "${JAVA_HOME}/bin:${M2_HOME}/bin:${PATH}"
-        MAVEN_OPTS = '-Xmx3072m -XX:MaxPermSize=512m'
+        MAVEN_OPTS = '-Xmx3072m'  // MaxPermSize kaldırıldı
         PROJECT_NAME = 'Radio BDD Automations Tests'
         TIMESTAMP = new Date().format('yyyy-MM-dd_HH-mm-ss')
         CUCUMBER_REPORTS = 'target/cucumber-reports'
+        ALLURE_RESULTS = 'target/allure-results'
     }
 
     stages {
@@ -29,7 +30,6 @@ pipeline {
                 cleanWs()
                 checkout scm
 
-                // Environment Check
                 sh '''
                     export JAVA_HOME=/usr/local/opt/openjdk@17
                     echo "JAVA_HOME = ${JAVA_HOME}"
@@ -59,7 +59,7 @@ pipeline {
                             export JAVA_HOME=/usr/local/opt/openjdk@17
                             ${M2_HOME}/bin/mvn test \
                             -Dtest=runner.TestRunner \
-                            -Dcucumber.plugin="pretty,json:target/cucumber.json,utils.formatter.PrettyReports:target/cucumber-pretty-reports" \
+                            -Dcucumber.plugin="pretty,json:target/cucumber.json,utils.formatter.PrettyReports:target/cucumber-pretty-reports,io.qameta.allure.cucumber7jvm.AllureCucumber7Jvm" \
                             | tee execution.log
                         """
                     } catch (Exception e) {
@@ -72,17 +72,30 @@ pipeline {
 
         stage('Generate Reports') {
             steps {
-                sh """
-                    export JAVA_HOME=/usr/local/opt/openjdk@17
-                    ${M2_HOME}/bin/mvn verify -DskipTests
-                    mkdir -p ${CUCUMBER_REPORTS}
-                """
+                script {
+                    // Cucumber Reports
+                    sh """
+                        export JAVA_HOME=/usr/local/opt/openjdk@17
+                        ${M2_HOME}/bin/mvn verify -DskipTests
+                        mkdir -p ${CUCUMBER_REPORTS}
+                    """
+
+                    // Allure Report
+                    allure([
+                        includeProperties: false,
+                        jdk: '',
+                        properties: [],
+                        reportBuildPolicy: 'ALWAYS',
+                        results: [[path: 'target/allure-results']]
+                    ])
+                }
             }
             post {
                 always {
                     archiveArtifacts artifacts: """
                         target/cucumber-pretty-reports/**/*,
                         target/cucumber.json,
+                        target/allure-results/**/*,
                         target/screenshots/**/*,
                         execution.log
                     """, allowEmptyArchive: true
@@ -110,6 +123,10 @@ pipeline {
 
                     📊 Test Results:
                     ${testResults}
+
+                    📝 Reports:
+                    - Cucumber Report: ${BUILD_URL}cucumber-html-reports/overview-features.html
+                    - Allure Report: ${BUILD_URL}allure/
 
                     ${currentBuild.result == 'SUCCESS' ? '✅ SUCCESS' : '❌ FAILED'}
                 """
