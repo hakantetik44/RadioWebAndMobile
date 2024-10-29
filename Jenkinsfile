@@ -3,11 +3,12 @@ pipeline {
 
     tools {
         maven 'maven'
-        jdk 'JDK17'
+        jdk 'JDK17'  // Jenkins üzerinde tanımlı olan JDK17
     }
 
     environment {
-        JAVA_HOME = "${tool 'JDK17'}"
+        // JAVA_HOME dizini, sisteminizdeki doğru Java dizinine ayarlandı
+        JAVA_HOME = "/Users/hakan/Library/Java/JavaVirtualMachines/corretto-17.0.12/Contents/Home"
         M2_HOME = tool 'maven'
         PATH = "${JAVA_HOME}/bin:${M2_HOME}/bin:${PATH}"
         MAVEN_OPTS = '-Xmx3072m'
@@ -34,8 +35,8 @@ pipeline {
                     echo "JAVA_HOME = ${JAVA_HOME}"
                     echo "M2_HOME = ${M2_HOME}"
                     echo "PATH = ${PATH}"
-                    java -version
-                    mvn -version
+                    java -version || { echo "Java is not available!"; exit 1; }
+                    mvn -version || { echo "Maven is not available!"; exit 1; }
                 '''
             }
         }
