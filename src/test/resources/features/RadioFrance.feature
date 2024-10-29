@@ -1,5 +1,5 @@
 Feature:Radio France Uygulamasında Arama
-
+@web
   Scenario: Radio France'da "histoire" araması yapma
     Given Uygulamayı başlatıyorum
     Then Ana sayfada olduğumu doğruluyorum
