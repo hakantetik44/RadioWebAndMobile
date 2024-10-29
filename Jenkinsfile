@@ -62,12 +62,14 @@ pipeline {
             steps {
                 script {
                     try {
-                        echo "🚀 Running Tests..."
+                        echo "🚀 Running Tests in Headless Mode..."
                         withEnv(["JAVA_HOME=${JAVA_HOME}"]) {
                             sh """
                                 ${M2_HOME}/bin/mvn test \
                                 -Dtest=runner.TestRunner \
                                 -Dcucumber.plugin="pretty,json:target/cucumber.json,io.qameta.allure.cucumber7jvm.AllureCucumber7Jvm" \
+                                -Dwebdriver.chrome.headless=true \
+                                -Dwebdriver.chrome.args="--headless,--disable-gpu,--window-size=1920,1080" \
                                 | tee execution.log
                             """
                         }
