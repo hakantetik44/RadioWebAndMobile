@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 public class TestManager {
     private static TestManager instance;
@@ -25,11 +26,13 @@ public class TestManager {
 
     private List<TestManager> rapportsTests;
     private static final String EXCEL_REPORTS_DIR = "target/rapports-tests";
+    private static final String PLATFORM = System.getProperty("platformName", "Web");
 
     public TestManager() {
         rapportsTests = new ArrayList<>();
         dateExecution = LocalDateTime.now();
         createReportsDirectory();
+        this.plateforme = PLATFORM;
     }
 
     private void createReportsDirectory() {
@@ -46,13 +49,12 @@ public class TestManager {
         return instance;
     }
 
-    // Helper method to create a copy of test info
     public static TestManager createTestInfo(TestManager source) {
         TestManager newInfo = new TestManager();
         newInfo.setNomScenario(source.getNomScenario());
         newInfo.setNomEtape(source.getNomEtape());
         newInfo.setStatut(source.getStatut());
-        newInfo.setPlateforme(source.getPlateforme());
+        newInfo.setPlateforme(PLATFORM);
         newInfo.setResultatAttendu(source.getResultatAttendu());
         newInfo.setResultatReel(source.getResultatReel());
         newInfo.setUrl(source.getUrl());
@@ -60,7 +62,6 @@ public class TestManager {
         return newInfo;
     }
 
-    // Getters and Setters
     public String getNomScenario() {
         return nomScenario;
     }
@@ -126,8 +127,20 @@ public class TestManager {
     }
 
     public void ajouterInfosTest(TestManager testInfo) {
-        testInfo.dateExecution = LocalDateTime.now();
-        rapportsTests.add(testInfo);
+        boolean isDuplicate = rapportsTests.stream()
+                .anyMatch(existing -> isSameStep(existing, testInfo));
+
+        if (!isDuplicate) {
+            testInfo.dateExecution = LocalDateTime.now();
+            testInfo.plateforme = PLATFORM;
+            rapportsTests.add(testInfo);
+        }
+    }
+
+    private boolean isSameStep(TestManager existing, TestManager newInfo) {
+        return Objects.equals(existing.getNomEtape(), newInfo.getNomEtape()) &&
+                Objects.equals(existing.getNomScenario(), newInfo.getNomScenario()) &&
+                Objects.equals(existing.getUrl(), newInfo.getUrl());
     }
 
     public void genererRapport(String nomRapport) {
@@ -137,24 +150,14 @@ public class TestManager {
         try (Workbook workbook = new XSSFWorkbook()) {
             Sheet sheet = workbook.createSheet("Résultats des Tests");
 
-            // Styles
             CellStyle headerStyle = createHeaderStyle(workbook);
             CellStyle successStyle = createSuccessStyle(workbook);
             CellStyle failureStyle = createFailureStyle(workbook);
 
-            // En-tête
             createHeader(sheet, headerStyle);
-
-            // Données
             fillData(sheet, successStyle, failureStyle);
-
-            // Ajuster les colonnes
             adjustColumns(sheet);
-
-            // Sauvegarder
             saveWorkbook(workbook, fileName);
-
-            // Afficher le résumé
             afficherResume(nomRapport);
 
         } catch (IOException e) {
@@ -208,24 +211,23 @@ public class TestManager {
         for (TestManager info : rapportsTests) {
             Row row = sheet.createRow(rowNum++);
 
-            row.createCell(0).setCellValue(info.getNomScenario());
-            row.createCell(1).setCellValue(info.getNomEtape());
+            row.createCell(0).setCellValue(info.getNomScenario() != null ? info.getNomScenario() : "");
+            row.createCell(1).setCellValue(info.getNomEtape() != null ? info.getNomEtape() : "");
 
             Cell statutCell = row.createCell(2);
-            statutCell.setCellValue(info.getStatut());
+            statutCell.setCellValue(info.getStatut() != null ? info.getStatut() : "");
 
-            // Utiliser REUSSI/ECHEC au lieu de PASSED/FAILED
             if ("REUSSI".equalsIgnoreCase(info.getStatut())) {
                 statutCell.setCellStyle(successStyle);
             } else if ("ECHEC".equalsIgnoreCase(info.getStatut())) {
                 statutCell.setCellStyle(failureStyle);
             }
 
-            row.createCell(3).setCellValue(info.getPlateforme());
-            row.createCell(4).setCellValue(info.getResultatAttendu());
-            row.createCell(5).setCellValue(info.getResultatReel());
-            row.createCell(6).setCellValue(info.getUrl());
-            row.createCell(7).setCellValue(info.getMessageErreur());
+            row.createCell(3).setCellValue(info.getPlateforme() != null ? info.getPlateforme() : PLATFORM);
+            row.createCell(4).setCellValue(info.getResultatAttendu() != null ? info.getResultatAttendu() : "");
+            row.createCell(5).setCellValue(info.getResultatReel() != null ? info.getResultatReel() : "");
+            row.createCell(6).setCellValue(info.getUrl() != null ? info.getUrl() : "");
+            row.createCell(7).setCellValue(info.getMessageErreur() != null ? info.getMessageErreur() : "");
             row.createCell(8).setCellValue(
                     info.dateExecution.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
             );
@@ -247,20 +249,28 @@ public class TestManager {
 
     private void afficherResume(String nomRapport) {
         System.out.println("\nRésumé du rapport: " + nomRapport);
-        for (TestManager info : rapportsTests) {
-            System.out.println("\n-----------------------------------");
-            System.out.println("Scénario: " + info.getNomScenario());
-            System.out.println("Étape: " + info.getNomEtape());
-            System.out.println("Statut: " + info.getStatut());
-            System.out.println("Plateforme: " + info.getPlateforme());
-            System.out.println("Résultat Attendu: " + info.getResultatAttendu());
-            System.out.println("Résultat Réel: " + info.getResultatReel());
-            System.out.println("URL: " + info.getUrl());
-            if (info.getMessageErreur() != null && !info.getMessageErreur().isEmpty()) {
-                System.out.println("Message d'Erreur: " + info.getMessageErreur());
-            }
-            System.out.println("Date d'Exécution: " +
-                    info.dateExecution.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-        }
+        rapportsTests.stream()
+                .filter(info -> info.getNomEtape() != null)
+                .forEach(info -> {
+                    System.out.println("\n-----------------------------------");
+                    System.out.println("Scénario: " + info.getNomScenario());
+                    System.out.println("Étape: " + info.getNomEtape());
+                    System.out.println("Statut: " + info.getStatut());
+                    System.out.println("Plateforme: " + info.getPlateforme());
+                    if (info.getResultatAttendu() != null) {
+                        System.out.println("Résultat Attendu: " + info.getResultatAttendu());
+                    }
+                    if (info.getResultatReel() != null) {
+                        System.out.println("Résultat Réel: " + info.getResultatReel());
+                    }
+                    if (info.getUrl() != null) {
+                        System.out.println("URL: " + info.getUrl());
+                    }
+                    if (info.getMessageErreur() != null && !info.getMessageErreur().isEmpty()) {
+                        System.out.println("Message d'Erreur: " + info.getMessageErreur());
+                    }
+                    System.out.println("Date d'Exécution: " +
+                            info.dateExecution.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                });
     }
 }
