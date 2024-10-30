@@ -97,22 +97,15 @@ public class TestManager {
 
     public void genererRapport(String nomRapport) {
         System.out.println("Génération du rapport: " + nomRapport);
-        String platformAffichee = ""; // Track displayed platform
         for (TestManager info : rapportsTests) {
             System.out.println("Nom du Scénario: " + info.getNomScenario());
             System.out.println("Nom de l'Étape: " + info.getNomEtape());
             System.out.println("Statut: " + info.getStatut());
-
-            // Display platform name only once
-            if (!platformAffichee.equals(info.getPlateforme())) {
-                System.out.println("Plateforme: " + info.getPlateforme());
-                platformAffichee = info.getPlateforme();
-            }
-
-            System.out.println("Résultat Attendu: " + info.getResultatAttendu());
-            System.out.println("Résultat Réel: " + info.getResultatReel());
-            System.out.println("URL: " + info.getUrl());
-            System.out.println("Message d'Erreur: " + info.getMessageErreur());
+            System.out.println("Plateforme: " + info.getPlateforme()); // Print platform
+            System.out.println("Résultat Attendu: " + info.getResultatAttendu()); // Print expected result
+            System.out.println("Résultat Réel: " + info.getResultatReel()); // Print actual result
+            System.out.println("URL: " + info.getUrl()); // Print URL
+            System.out.println("Message d'Erreur: " + info.getMessageErreur()); // Print error message
             System.out.println("-----------------------------------");
         }
     }
