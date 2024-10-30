@@ -2,20 +2,21 @@ pipeline {
     agent any
 
     tools {
-        maven 'maven'
-        jdk 'JDK17'
-        allure 'Allure'
+        maven 'maven' // Jenkins üzerinde tanımlı Maven
+        jdk 'JDK17' // Jenkins üzerinde tanımlı olan JDK17
+        allure 'Allure' // Jenkins üzerinde tanımlı Allure
     }
 
     environment {
-        JAVA_HOME = "/usr/local/opt/openjdk@17"
-        M2_HOME = tool 'maven'
-        PATH = "${JAVA_HOME}/bin:${M2_HOME}/bin:${PATH}"
+        JAVA_HOME = "/usr/local/opt/openjdk@17" // Güncellenmiş JAVA_HOME
+        M2_HOME = tool 'maven' // Maven'ı Jenkins'ten al
+        PATH = "${JAVA_HOME}/bin:${M2_HOME}/bin:${PATH}" // Doğru PATH ayarı
         MAVEN_OPTS = '-Xmx3072m'
         PROJECT_NAME = 'Radio BDD Automation Tests'
         TIMESTAMP = new Date().format('yyyy-MM-dd_HH-mm-ss')
         CUCUMBER_REPORTS = 'target/cucumber-reports'
         ALLURE_RESULTS = 'target/allure-results'
+        PDF_REPORT = "Test_Report_${TIMESTAMP}.pdf" // PDF rapor dosyası
     }
 
     stages {
@@ -32,50 +33,51 @@ pipeline {
                 checkout scm
 
                 sh '''
-                    export JAVA_HOME=/usr/local/opt/openjdk@17
-                    echo "JAVA_HOME = ${JAVA_HOME}"
-                    echo "M2_HOME = ${M2_HOME}"
+                    echo "\033[0;36mJAVA_HOME = ${JAVA_HOME}\033[0m"
+                    echo "\033[0;36mM2_HOME = ${M2_HOME}\033[0m"
+                    echo "\033[0;36mPATH = ${PATH}\033[0m"
+
+                    if [ -z "$JAVA_HOME" ]; then
+                        echo "\033[0;31mJAVA_HOME is not set!\033[0m"
+                        exit 1
+                    fi
+
+                    if [ ! -x "${JAVA_HOME}/bin/java" ]; then
+                        echo "\033[0;31mJava is not available in JAVA_HOME!\033[0m"
+                        exit 1
+                    fi
+
                     java -version
-                    ${M2_HOME}/bin/mvn -version
+                    mvn -version || { echo "\033[0;31mMaven is not available!\033[0m"; exit 1; }
                 '''
             }
         }
 
         stage('Build & Dependencies') {
             steps {
-                sh """
-                    export JAVA_HOME=/usr/local/opt/openjdk@17
-                    ${M2_HOME}/bin/mvn clean install -DskipTests
-                """
+                sh "${M2_HOME}/bin/mvn clean install -DskipTests || { echo 'Build failed'; exit 1; }"
             }
         }
 
         stage('Run Tests') {
             steps {
                 script {
-                    echo "🚀 Running Tests..."
-                    sh """
-                        export JAVA_HOME=/usr/local/opt/openjdk@17
-                        ${M2_HOME}/bin/mvn test \
-                        -Dtest=runner.TestRunner \
-                        -Dcucumber.plugin="pretty,json:target/cucumber.json,io.qameta.allure.cucumber7jvm.AllureCucumber7Jvm" \
-                        -Dwebdriver.chrome.headless=true \
-                        -Dwebdriver.chrome.args="--headless,--disable-gpu,--window-size=1920,1080" \
-                        | tee test-output.txt
-
-                        # Test sonuçlarını formatla
-                        cat test-output.txt | while IFS= read -r line; do
-                            if [[ \$line == *"Given"* ]] || [[ \$line == *"When"* ]] || [[ \$line == *"Then"* ]] || [[ \$line == *"And"* ]]; then
-                                echo "✅ \$line" >> execution.log
-                            elif [[ \$line == *"pop-up not found"* ]] || [[ \$line == *"already closed"* ]] || [[ \$line == *"already declined"* ]] || [[ \$line == *"already accepted"* ]]; then
-                                echo "ℹ️ \$line" >> execution.log
-                            elif [[ \$line == *"expectedUrl"* ]] || [[ \$line == *"actualUrl"* ]]; then
-                                echo "🔍 \$line" >> execution.log
-                            else
-                                echo "\$line" >> execution.log
-                            fi
-                        done
-                    """
+                    try {
+                        echo "\033[0;32m🚀 Running Tests in Headless Mode...\033[0m"
+                        withEnv(["JAVA_HOME=${JAVA_HOME}"]) {
+                            sh """
+                                ${M2_HOME}/bin/mvn test \
+                                -Dtest=runner.TestRunner \
+                                -Dcucumber.plugin="pretty,json:target/cucumber.json,io.qameta.allure.cucumber7jvm.AllureCucumber7Jvm" \
+                                -Dwebdriver.chrome.headless=true \
+                                -Dwebdriver.chrome.args="--headless,--disable-gpu,--window-size=1920,1080" \
+                                | tee execution.log || { echo "Maven test failed"; currentBuild.result = 'FAILURE'; exit 1; }
+                            """
+                        }
+                    } catch (Exception e) {
+                        currentBuild.result = 'FAILURE'
+                        throw e
+                    }
                 }
             }
         }
@@ -84,8 +86,8 @@ pipeline {
             steps {
                 script {
                     sh """
-                        export JAVA_HOME=/usr/local/opt/openjdk@17
-                        ${M2_HOME}/bin/mvn verify -DskipTests
+                        ${M2_HOME}/bin/mvn verify -DskipTests || { echo 'Report generation failed'; exit 1; }
+                        mkdir -p ${CUCUMBER_REPORTS}
                     """
 
                     allure([
@@ -93,18 +95,25 @@ pipeline {
                         jdk: '',
                         properties: [],
                         reportBuildPolicy: 'ALWAYS',
-                        results: [[path: 'target/allure-results']]
+                        results: [[path: ALLURE_RESULTS]]
                     ])
+
+                    // HTML raporunu PDF'ye dönüştür
+                    echo "\033[0;34mGenerating PDF Report...\033[0m"
+                    sh """
+                        wkhtmltopdf ${BUILD_URL}cucumber-html-reports/overview-features.html ${PDF_REPORT} || { echo 'PDF report generation failed'; exit 1; }
+                    """
                 }
             }
             post {
                 always {
                     archiveArtifacts artifacts: """
-                        target/cucumber-reports/**/*,
+                        ${CUCUMBER_REPORTS}/**/*,
                         target/cucumber.json,
-                        target/allure-results/**/*,
+                        ${ALLURE_RESULTS}/**/*,
                         target/screenshots/**/*,
-                        execution.log
+                        execution.log,
+                        ${PDF_REPORT}
                     """, allowEmptyArchive: true
 
                     cucumber buildStatus: 'UNSTABLE',
@@ -116,7 +125,7 @@ pipeline {
     }
 
     post {
-        success {
+        always {
             script {
                 def testResults = ""
                 if (fileExists('execution.log')) {
@@ -134,37 +143,11 @@ pipeline {
                     📝 Reports:
                     - Cucumber Report: ${BUILD_URL}cucumber-html-reports/overview-features.html
                     - Allure Report: ${BUILD_URL}allure/
+                    - PDF Report: ${BUILD_URL}${PDF_REPORT}
 
-                    ✅ Tests Completed Successfully!
-
-                    Test Steps Summary:
-                    ==================
-                    ✅ Given/When/Then/And steps completed
-                    ℹ️ Informational messages (pop-ups, cookies)
-                    🔍 URL verifications
+                    ${currentBuild.result == 'SUCCESS' ? '✅ SUCCESS' : '❌ FAILED'}
                 """
             }
-        }
-        failure {
-            script {
-                def testResults = ""
-                if (fileExists('execution.log')) {
-                    testResults = readFile('execution.log').trim()
-                }
-
-                echo """
-                    ╔══════════════════════════════════╗
-                    ║       Test Execution Failed      ║
-                    ╚══════════════════════════════════╝
-
-                    📊 Test Results:
-                    ${testResults}
-
-                    ❌ FAILED: Check the logs for details
-                """
-            }
-        }
-        always {
             cleanWs()
         }
     }
