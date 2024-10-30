@@ -17,6 +17,7 @@ pipeline {
         CUCUMBER_REPORTS = 'target/cucumber-reports'
         ALLURE_RESULTS = 'target/allure-results'
         EXCEL_REPORTS = 'target/rapports-tests'
+        SOURCE_PROJECT = '/Users/hakan/IdeaProjects/RadioWebAndMobile'
     }
 
     stages {
@@ -32,29 +33,31 @@ pipeline {
                     cleanWs()
                     checkout scm
 
-                    // Vérification de la structure du projet
+                    // Création des répertoires nécessaires
                     sh '''
-                        echo "=== Vérification de la Structure du Projet ==="
-
-                        # Création des répertoires
+                        echo "=== Création des répertoires ==="
                         mkdir -p src/test/java/utils
                         mkdir -p ${CUCUMBER_REPORTS}
                         mkdir -p ${ALLURE_RESULTS}
                         mkdir -p ${EXCEL_REPORTS}
                         mkdir -p target/screenshots
+                    '''
 
-                        # Vérification des fichiers de test
-                        if [ ! -f "src/test/java/utils/TestInfo.java" ] || [ ! -f "src/test/java/utils/TestReportManager.java" ]; then
-                            echo "ERREUR: Les fichiers de test sont manquants!"
-                            exit 1
-                        fi
+                    // Copie des fichiers sources
+                    sh """
+                        echo "=== Copie des fichiers sources ==="
+                        cp '${SOURCE_PROJECT}/src/test/java/utils/TestInfo.java' src/test/java/utils/TestInfo.java
+                        cp '${SOURCE_PROJECT}/src/test/java/utils/TestReportManager.java' src/test/java/utils/TestReportManager.java
 
-                        echo "=== Vérification de l'Environnement ==="
+                        echo "Vérification des fichiers copiés:"
+                        ls -l src/test/java/utils/
+                    """
+
+                    echo "=== Vérification de l'environnement ==="
+                    sh '''
                         echo "JAVA_HOME = ${JAVA_HOME}"
                         echo "M2_HOME = ${M2_HOME}"
-                        echo "PATH = ${PATH}"
 
-                        # Vérification de Java
                         if [ -z "$JAVA_HOME" ]; then
                             echo "ERREUR: JAVA_HOME n'est pas défini!"
                             exit 1
