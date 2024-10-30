@@ -19,142 +19,142 @@ import java.net.MalformedURLException;
 import java.time.Duration;
 
 public class Hooks {
-    public static final String APK_NAME = "radio-france.apk";
-    public static final String WEB_URL = "https://www.radiofrance.fr/franceculture";
-    protected WebDriverWait wait;
-    private TestInfo testInfo;
+    public static final String NOM_APK = "radio-france.apk";
+    public static final String URL_WEB = "https://www.radiofrance.fr/franceculture";
+    protected WebDriverWait attente;
+    private TestInfo infosTest;
 
     @Before
-    public void beforeAll(Scenario scenario) throws MalformedURLException {
-        // Test raporu için bilgileri ayarla
-        testInfo = new TestInfo();
-        testInfo.setScenarioName(scenario.getName());
-        testInfo.setStepName("Test Başlangıcı");
-        testInfo.setStatus("STARTED");
+    public void avantTout(Scenario scenario) throws MalformedURLException {
+        // Initialiser les informations pour le rapport de test
+        infosTest = new TestInfo();
+        infosTest.setNomScenario(scenario.getName());
+        infosTest.setNomEtape("Début du Test");
+        infosTest.setStatut("DÉMARRÉ");
 
-        // Platform bilgisini ayarla
+        // Définir la plateforme
         OS.OS = ConfigReader.getProperty("platformName");
-        testInfo.setPlatform(OS.OS);
+        infosTest.setPlateforme(OS.OS);
 
-        TestReportManager.getInstance().addTestInfo(testInfo);
+        TestReportManager.getInstance().ajouterInfosTest(infosTest);
 
-        // Platform spesifik başlatma işlemleri
+        // Initialisations spécifiques à la plateforme
         if (OS.isWeb()) {
-            testInfo.setExpectedResult("Web tarayıcı başlatılmalı");
+            infosTest.setResultatAttendu("Le navigateur web doit être lancé");
         } else if (OS.isAndroid()) {
-            testInfo.setExpectedResult("Android uygulama başlatılmalı");
+            infosTest.setResultatAttendu("L'application Android doit être lancée");
         }
     }
 
-    @Given("Uygulamayı başlatıyorum")
+    @Given("Je lance l'application")
     public void lanceApp() throws MalformedURLException {
-        TestInfo appLaunchInfo = new TestInfo();
-        appLaunchInfo.setStepName("Uygulama Başlatma");
+        TestInfo infosLancementApp = new TestInfo();
+        infosLancementApp.setNomEtape("Lancement de l'Application");
 
         try {
             if (OS.isAndroid()) {
-                System.out.println("Launching Android app: " + APK_NAME);
+                System.out.println("Lancement de l'application Android : " + NOM_APK);
                 Driver.Android = Driver.getAndroidDriver(Driver.getAndroidApps());
-                appLaunchInfo.setStatus("PASSED");
-                appLaunchInfo.setActualResult("Android uygulama başarıyla başlatıldı");
+                infosLancementApp.setStatut("RÉUSSI");
+                infosLancementApp.setResultatReel("L'application Android a été lancée avec succès");
             } else if (OS.isWeb()) {
-                System.out.println("Launching web app: " + WEB_URL);
+                System.out.println("Lancement de l'application web : " + URL_WEB);
                 Driver.Web = Driver.getWebDriver(ConfigReader.getProperty("browser"));
-                Driver.Web.get(WEB_URL);
-                this.wait = new WebDriverWait(Driver.Web, Duration.ofSeconds(1));
-                handlePopupsAndCookies();
-                appLaunchInfo.setStatus("PASSED");
-                appLaunchInfo.setActualResult("Web uygulama başarıyla başlatıldı");
-                appLaunchInfo.setUrl(WEB_URL);
+                Driver.Web.get(URL_WEB);
+                this.attente = new WebDriverWait(Driver.Web, Duration.ofSeconds(1));
+                gererPopupsEtCookies();
+                infosLancementApp.setStatut("RÉUSSI");
+                infosLancementApp.setResultatReel("L'application web a été lancée avec succès");
+                infosLancementApp.setUrl(URL_WEB);
             }
         } catch (Exception e) {
-            appLaunchInfo.setStatus("FAILED");
-            appLaunchInfo.setErrorMessage("Uygulama başlatma hatası: " + e.getMessage());
+            infosLancementApp.setStatut("ÉCHOUÉ");
+            infosLancementApp.setMessageErreur("Erreur de lancement de l'application : " + e.getMessage());
             throw e;
         } finally {
-            TestReportManager.getInstance().addTestInfo(appLaunchInfo);
+            TestReportManager.getInstance().ajouterInfosTest(infosLancementApp);
         }
     }
 
-    private void handlePopupsAndCookies() {
-        TestInfo popupInfo = new TestInfo();
-        popupInfo.setStepName("Popup ve Cookie Yönetimi");
+    private void gererPopupsEtCookies() {
+        TestInfo infosPopup = new TestInfo();
+        infosPopup.setNomEtape("Gestion des Popups et Cookies");
 
         try {
-            // Reklam popup'ı kapatma
+            // Fermer le popup de publicité
             try {
-                WebElement closeButton = wait.until(ExpectedConditions.elementToBeClickable(
+                WebElement boutonFermer = attente.until(ExpectedConditions.elementToBeClickable(
                         By.xpath("//span[text()='Tout refuser']")));
-                closeButton.click();
-                popupInfo.setActualResult("Reklam popup'ı kapatıldı");
+                boutonFermer.click();
+                infosPopup.setResultatReel("Popup de publicité fermé");
             } catch (Exception e) {
-                popupInfo.setActualResult("Reklam popup'ı bulunamadı veya zaten kapalı");
+                infosPopup.setResultatReel("Popup de publicité non trouvé ou déjà fermé");
             }
 
-            // Genel popup reddetme
+            // Refuser les autres popups
             try {
-                WebElement popupRefuse = wait.until(ExpectedConditions.elementToBeClickable(
+                WebElement popupRefuser = attente.until(ExpectedConditions.elementToBeClickable(
                         By.xpath("//span[text()='Tout refuser']")));
-                popupRefuse.click();
-                popupInfo.setActualResult(popupInfo.getActualResult() + "\nPopup reddedildi");
+                popupRefuser.click();
+                infosPopup.setResultatReel(infosPopup.getResultatReel() + "\nPopup refusé");
             } catch (Exception e) {
-                popupInfo.setActualResult(popupInfo.getActualResult() + "\nPopup bulunamadı veya zaten reddedilmiş");
+                infosPopup.setResultatReel(infosPopup.getResultatReel() + "\nPopup non trouvé ou déjà refusé");
             }
 
-            // Cookie kabul etme
+            // Accepter les cookies
             try {
-                WebElement cookiesAccept = wait.until(ExpectedConditions.elementToBeClickable(
+                WebElement accepterCookies = attente.until(ExpectedConditions.elementToBeClickable(
                         By.xpath("//span[text()='Tout accepter']")));
-                cookiesAccept.click();
-                popupInfo.setActualResult(popupInfo.getActualResult() + "\nCookie'ler kabul edildi");
+                accepterCookies.click();
+                infosPopup.setResultatReel(infosPopup.getResultatReel() + "\nCookies acceptés");
             } catch (Exception e) {
-                popupInfo.setActualResult(popupInfo.getActualResult() + "\nCookie butonu bulunamadı veya zaten kabul edilmiş");
+                infosPopup.setResultatReel(infosPopup.getResultatReel() + "\nBouton de cookies non trouvé ou déjà accepté");
             }
 
-            popupInfo.setStatus("PASSED");
+            infosPopup.setStatut("RÉUSSI");
         } catch (Exception e) {
-            popupInfo.setStatus("WARNING");
-            popupInfo.setErrorMessage("Popup işlemlerinde uyarı: " + e.getMessage());
+            infosPopup.setStatut("AVERTISSEMENT");
+            infosPopup.setMessageErreur("Avertissement lors du traitement des popups : " + e.getMessage());
         } finally {
-            TestReportManager.getInstance().addTestInfo(popupInfo);
+            TestReportManager.getInstance().ajouterInfosTest(infosPopup);
         }
     }
 
     @After
-    public void tearDown(Scenario scenario) {
-        testInfo = new TestInfo();
-        testInfo.setScenarioName(scenario.getName());
-        testInfo.setStepName("Test Sonlandırma");
+    public void terminer(Scenario scenario) {
+        infosTest = new TestInfo();
+        infosTest.setNomScenario(scenario.getName());
+        infosTest.setNomEtape("Fin du Test");
 
         try {
             if (scenario.isFailed()) {
-                testInfo.setStatus("FAILED");
+                infosTest.setStatut("ÉCHOUÉ");
 
-                // Screenshot al
+                // Prendre une capture d'écran
                 WebDriver driver = Driver.getCurrentDriver();
                 if (driver != null && driver instanceof TakesScreenshot) {
-                    byte[] screenshot = ((TakesScreenshot) driver).getScreenshotAs(OutputType.BYTES);
-                    scenario.attach(screenshot, "image/png", "screenshot-" + scenario.getName());
-                    testInfo.setActualResult("Test başarısız oldu - Screenshot eklendi");
+                    byte[] captureEcran = ((TakesScreenshot) driver).getScreenshotAs(OutputType.BYTES);
+                    scenario.attach(captureEcran, "image/png", "capture-" + scenario.getName());
+                    infosTest.setResultatReel("Test échoué - Capture d'écran ajoutée");
                 }
             } else {
-                testInfo.setStatus("PASSED");
-                testInfo.setActualResult("Test başarıyla tamamlandı");
+                infosTest.setStatut("RÉUSSI");
+                infosTest.setResultatReel("Test terminé avec succès");
             }
 
-            // Son URL'yi kaydet
+            // Enregistrer l'URL finale
             WebDriver driver = Driver.getCurrentDriver();
             if (driver != null) {
-                testInfo.setUrl(driver.getCurrentUrl());
+                infosTest.setUrl(driver.getCurrentUrl());
             }
 
         } catch (Exception e) {
-            testInfo.setStatus("ERROR");
-            testInfo.setErrorMessage("Test sonlandırma hatası: " + e.getMessage());
+            infosTest.setStatut("ERREUR");
+            infosTest.setMessageErreur("Erreur lors de la fin du test : " + e.getMessage());
         } finally {
-            TestReportManager.getInstance().addTestInfo(testInfo);
-            TestReportManager.getInstance().generateReport("RadioFrance");
-            quitDriver();
+            TestReportManager.getInstance().ajouterInfosTest(infosTest);
+            TestReportManager.getInstance().genererRapport("RadioFrance");
+            quitterDriver();
         }
     }
 
@@ -162,20 +162,20 @@ public class Hooks {
         return "com.radiofrance.radio.radiofrance.android";
     }
 
-    private void killApplication(AndroidDriver driver) {
+    private void terminerApplication(AndroidDriver driver) {
         if (driver != null) {
             driver.terminateApp(getAppPackage());
         }
     }
 
-    private void quitDriver() {
+    private void quitterDriver() {
         WebDriver driver = Driver.getCurrentDriver();
         if (driver != null) {
             try {
-                Thread.sleep(5000); // 5 saniye bekle
+                Thread.sleep(5000); // Attendre 5 secondes
 
                 if (OS.OS.equals("Android")) {
-                    killApplication((AndroidDriver) driver);
+                    terminerApplication((AndroidDriver) driver);
                 }
                 driver.quit();
 

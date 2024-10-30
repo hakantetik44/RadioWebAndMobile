@@ -2,7 +2,7 @@ package utils;
 
 import java.time.LocalDateTime;
 
-public class InfosTest {
+public class TestInfo {
     private String nomScenario;
     private String nomEtape;
     private String statut;
@@ -13,7 +13,7 @@ public class InfosTest {
     private String url;
     private LocalDateTime heureExecution;
 
-    public InfosTest() {
+    public TestInfo() {
         this.heureExecution = LocalDateTime.now();
     }
 

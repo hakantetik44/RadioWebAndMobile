@@ -7,25 +7,25 @@ import utils.OS;
 
 import static utils.Driver.getCurrentDriver;
 
-public class RadioPage extends BasePage{
+public class RadioPage extends BasePage {
 
-    public RadioPage(){
+    public RadioPage() {
         super(getCurrentDriver());
         PageFactory.initElements(getCurrentDriver(), this);
     }
-    public void aramaYap(String searchTerm) {
-        By ara = OS.isAndroid() ?
+
+    public void effectuerRecherche(String termeRecherche) {
+        By champRecherche = OS.isAndroid() ?
                 AppiumBy.androidUIAutomator("new UiSelector().text(\"Recherche\")") :
                 By.xpath("//input[@aria-label='Rechercher un podcast, un épisode, une personnalité...']");
-        sendKeys(ara, searchTerm);
+        sendKeys(champRecherche, termeRecherche);
     }
 
-    public void clickBtnRechercher(){
-        By btnRecherche = OS.isAndroid() ?
-                AppiumBy.accessibilityId("Recherche"):
+    public void cliquerBtnRechercher() {
+        By btnRechercher = OS.isAndroid() ?
+                AppiumBy.accessibilityId("Recherche") :
                 By.xpath("//span[normalize-space()='Rechercher']");
-        getCurrentDriver().findElement(btnRecherche).click();
+        getCurrentDriver().findElement(btnRechercher).click();
     }
-
 
 }

@@ -9,88 +9,89 @@ import utils.TestReportManager;
 
 import static org.junit.Assert.assertEquals;
 
-public class RadioStep {
-    private RadioPage radioPage = new RadioPage();
-    private TestInfo testInfo;
+public class RadioStep{
+    private RadioPage pageRadio = new RadioPage();
+    private TestInfo infosTest;
 
     public RadioStep() {
-        testInfo = new TestInfo();
+        infosTest = new TestInfo();
     }
 
-    @Then("Ana sayfada olduğumu doğruluyorum")
-    public void anaSayfayiDogrula() {
-        testInfo.setStepName("Ana sayfa doğrulama");
+    @Then("Je vérifie que je suis sur la page d'accueil")
+    public void verifierPageAccueil() {
+        infosTest.setNomEtape("Vérification de la page d'accueil");
         try {
-            // Mevcut kod...
-            testInfo.setStatus("PASSED");
+            // Code existant...
+            infosTest.setStatut("RÉUSSI");
         } catch (Exception e) {
-            testInfo.setStatus("FAILED");
-            testInfo.setErrorMessage(e.getMessage());
+            infosTest.setStatut("ÉCHOUÉ");
+            infosTest.setMessageErreur(e.getMessage());
             throw e;
         } finally {
-            TestReportManager.getInstance().addTestInfo(testInfo);
+            TestReportManager.getInstance().ajouterInfosTest(infosTest);
         }
     }
 
-    @When("{string} düğmesine tıklarsam")
-    public void düğmesineTikla(String aramaButonu) {
-        testInfo = new TestInfo();
-        testInfo.setStepName("Arama butonu tıklama: " + aramaButonu);
+    @When("Je clique sur le bouton {string}")
+    public void cliquerSurLeBouton(String nomBoutonRecherche) {
+        infosTest = new TestInfo();
+        infosTest.setNomEtape("Clic sur le bouton de recherche : " + nomBoutonRecherche);
 
         try {
-            radioPage.clickBtnRechercher();
-            testInfo.setStatus("PASSED");
+            pageRadio.cliquerBtnRechercher();
+            infosTest.setStatut("RÉUSSI");
         } catch (Exception e) {
-            testInfo.setStatus("FAILED");
-            testInfo.setErrorMessage(e.getMessage());
+            infosTest.setStatut("ÉCHOUÉ");
+            infosTest.setMessageErreur(e.getMessage());
             throw e;
         } finally {
-            TestReportManager.getInstance().addTestInfo(testInfo);
+            TestReportManager.getInstance().ajouterInfosTest(infosTest);
         }
     }
 
-    @When("Arama alanına {string} yazarsam")
-    public void aramaYap(String histoire) {
-        testInfo = new TestInfo();
-        testInfo.setStepName("Arama yapma");
-        testInfo.setExpectedResult("Arama alanına '" + histoire + "' yazılmalı");
+    @When("Je saisis {string} dans le champ de recherche")
+    public void effectuerRecherche(String histoire) {
+        infosTest = new TestInfo();
+        infosTest.setNomEtape("Effectuer une recherche");
+        infosTest.setResultatAttendu("Le texte '" + histoire + "' doit être saisi dans le champ de recherche");
 
         try {
-            radioPage.aramaYap(histoire);
-            testInfo.setStatus("PASSED");
-            testInfo.setActualResult("Arama yapıldı: " + histoire);
+            pageRadio.effectuerRecherche(histoire);
+            infosTest.setStatut("RÉUSSI");
+            infosTest.setResultatReel("Recherche effectuée : " + histoire);
         } catch (Exception e) {
-            testInfo.setStatus("FAILED");
-            testInfo.setErrorMessage(e.getMessage());
+            infosTest.setStatut("ÉCHOUÉ");
+            infosTest.setMessageErreur(e.getMessage());
             throw e;
         } finally {
-            TestReportManager.getInstance().addTestInfo(testInfo);
+            TestReportManager.getInstance().ajouterInfosTest(infosTest);
         }
     }
 
-    @Then("Histoire için sonuçlar gorunmeli")
-    public void sonuclariDogrula() throws InterruptedException {
-        testInfo = new TestInfo();
-        testInfo.setStepName("Sonuçları doğrulama");
 
-        String expectedUrl = "https://www.radiofrance.fr/recherche";
-        testInfo.setExpectedResult("URL: " + expectedUrl);
+    @Then("Les résultats pour {string} doivent être affichés")
+    public void lesResultatsPourDoiventEtreAffiches(String histoire) throws InterruptedException {
+        infosTest = new TestInfo();
+        infosTest.setNomEtape("Vérification des résultats de recherche");
+
+        String urlAttendue = "https://www.radiofrance.fr/recherche";
+        infosTest.setResultatAttendu("URL attendue : " + urlAttendue);
 
         try {
-            String actualUrl = Driver.getCurrentDriver().getCurrentUrl();
-            testInfo.setActualResult("URL: " + actualUrl);
-            testInfo.setUrl(actualUrl);
+            String urlReelle = Driver.getCurrentDriver().getCurrentUrl();
+            infosTest.setResultatReel("URL actuelle : " + urlReelle);
+            infosTest.setUrl(urlReelle);
 
             Thread.sleep(3000);
-            assertEquals(expectedUrl, actualUrl);
+            assertEquals(urlAttendue, urlReelle);
 
-            testInfo.setStatus("PASSED");
+            infosTest.setStatut("RÉUSSI");
         } catch (Exception e) {
-            testInfo.setStatus("FAILED");
-            testInfo.setErrorMessage(e.getMessage());
+            infosTest.setStatut("ÉCHOUÉ");
+            infosTest.setMessageErreur(e.getMessage());
             throw e;
         } finally {
-            TestReportManager.getInstance().addTestInfo(testInfo);
+            TestReportManager.getInstance().ajouterInfosTest(infosTest);
         }
     }
 }

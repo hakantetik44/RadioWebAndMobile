@@ -2,6 +2,7 @@ package utils;
 
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -11,16 +12,18 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
-public class GestionnaireRapportTest {
-    private static GestionnaireRapportTest instance;
-    private List<InfosTest> listeInfosTest;
-    private static final String REPERTOIRE_RAPPORT = "target/rapports-tests";
+public class TestReportManager {
+    private static TestReportManager instance; // Singleton instance
+    private List<TestInfo> listeInfosTest; // List to hold test info
+    private static final String REPERTOIRE_RAPPORT = "target/rapports-tests"; // Directory for reports
 
-    private GestionnaireRapportTest() {
+    // Private constructor for singleton pattern
+    private TestReportManager() {
         listeInfosTest = new ArrayList<>();
-        creerRepertoireRapport();
+        creerRepertoireRapport(); // Create report directory
     }
 
+    // Method to create report directory if it doesn't exist
     private void creerRepertoireRapport() {
         try {
             Path cheminRapport = Paths.get(REPERTOIRE_RAPPORT);
@@ -32,19 +35,22 @@ public class GestionnaireRapportTest {
         }
     }
 
-    public static GestionnaireRapportTest getInstance() {
+    // Method to get the singleton instance
+    public static TestReportManager getInstance() {
         if (instance == null) {
-            instance = new GestionnaireRapportTest();
+            instance = new TestReportManager();
         }
         return instance;
     }
 
-    public void ajouterInfosTest(InfosTest infosTest) {
+    // Method to add test information
+    public void ajouterInfosTest(TestInfo infosTest) {
         if (infosTest != null) {
             listeInfosTest.add(infosTest);
         }
     }
 
+    // Method to generate the test report
     public void genererRapport(String nomTest) {
         String horodatage = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss")
                 .format(java.time.LocalDateTime.now());
@@ -53,7 +59,7 @@ public class GestionnaireRapportTest {
         try (Workbook classeur = new XSSFWorkbook()) {
             Sheet feuille = classeur.createSheet("Résultats des Tests");
 
-            // Style de l'en-tête
+            // Style for header
             CellStyle styleEnTete = classeur.createCellStyle();
             Font policeEnTete = classeur.createFont();
             policeEnTete.setBold(true);
@@ -61,7 +67,7 @@ public class GestionnaireRapportTest {
             styleEnTete.setFillForegroundColor(IndexedColors.GREY_25_PERCENT.getIndex());
             styleEnTete.setFillPattern(FillPatternType.SOLID_FOREGROUND);
 
-            // Ligne de l'en-tête
+            // Header row
             Row ligneEnTete = feuille.createRow(0);
             String[] colonnes = {
                     "Scénario", "Étape", "Statut", "Plateforme",
@@ -73,14 +79,14 @@ public class GestionnaireRapportTest {
                 Cell cellule = ligneEnTete.createCell(i);
                 cellule.setCellValue(colonnes[i]);
                 cellule.setCellStyle(styleEnTete);
-                feuille.setColumnWidth(i, 6000);
+                feuille.setColumnWidth(i, 6000); // Set column width
             }
 
-            // Remplir les données de test
+            // Fill test data
             int numeroLigne = 1;
             DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-            for (InfosTest infos : listeInfosTest) {
+            for (TestInfo infos : listeInfosTest) {
                 Row ligne = feuille.createRow(numeroLigne++);
 
                 ligne.createCell(0).setCellValue(infos.getNomScenario());
@@ -91,11 +97,9 @@ public class GestionnaireRapportTest {
                 ligne.createCell(5).setCellValue(infos.getResultatReel());
                 ligne.createCell(6).setCellValue(infos.getMessageErreur());
                 ligne.createCell(7).setCellValue(infos.getUrl());
-                ligne.createCell(8).setCellValue(
-                        infos.getHeureExecution().format(dtf)
-                );
+                ligne.createCell(8).setCellValue(infos.getHeureExecution().format(dtf));
 
-                // Style rouge pour les tests échoués
+                // Style red for failed tests
                 if ("FAILED".equals(infos.getStatut())) {
                     CellStyle styleEchec = classeur.createCellStyle();
                     styleEchec.setFillForegroundColor(IndexedColors.ROSE.getIndex());
@@ -104,7 +108,7 @@ public class GestionnaireRapportTest {
                 }
             }
 
-            // Sauvegarder le rapport
+            // Save the report
             try (FileOutputStream sortie = new FileOutputStream(nomFichier)) {
                 classeur.write(sortie);
                 System.out.println("Rapport de test créé : " + nomFichier);
@@ -116,11 +120,13 @@ public class GestionnaireRapportTest {
         }
     }
 
+    // Method to clear test information
     public void effacerInfosTest() {
         listeInfosTest.clear();
     }
 
-    public List<InfosTest> getListeInfosTest() {
+    // Getter for the list of test information
+    public List<TestInfo> getListeInfosTest() {
         return new ArrayList<>(listeInfosTest);
     }
 }
