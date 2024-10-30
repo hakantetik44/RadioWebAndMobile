@@ -16,6 +16,7 @@ pipeline {
         TIMESTAMP = new Date().format('yyyy-MM-dd_HH-mm-ss')
         CUCUMBER_REPORTS = 'target/cucumber-reports'
         ALLURE_RESULTS = 'target/allure-results'
+        EXCEL_REPORTS = 'target/rapports-tests'
     }
 
     stages {
@@ -31,73 +32,35 @@ pipeline {
                     cleanWs()
                     checkout scm
 
-                    // Verify and create directories
-                    sh '''
-                        mkdir -p src/test/java/utils
-                        mkdir -p ${CUCUMBER_REPORTS}
-                        mkdir -p ${ALLURE_RESULTS}
-                        mkdir -p target/screenshots
-                        mkdir -p target/rapports-tests
-                    '''
-
-                    // Create InfosTest.java
-                    writeFile file: 'src/test/java/utils/InfosTest.java', text: '''
-                        package utils;
-
-                        import java.time.LocalDateTime;
-
-                        public class InfosTest {
-                            private String nomScenario;
-                            private String nomEtape;
-                            private String statut;
-                            private String plateforme;
-                            private String resultatAttendu;
-                            private String resultatReel;
-                            private String messageErreur;
-                            private String url;
-                            private LocalDateTime heureExecution;
-
-                            public InfosTest() {
-                                this.heureExecution = LocalDateTime.now();
-                            }
-
-                            // Getters ve Setters metodları...
-                            // (Önceki kodda verilen tüm getter ve setter metodları)
-                        }
-                    '''
-
-                    // Create GestionnaireRapportTest.java
-                    writeFile file: 'src/test/java/utils/GestionnaireRapportTest.java', text: '''
-                        package utils;
-
-                        import org.apache.poi.ss.usermodel.*;
-                        import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-                        import java.io.FileOutputStream;
-                        import java.io.IOException;
-                        import java.nio.file.Files;
-                        import java.nio.file.Path;
-                        import java.nio.file.Paths;
-                        import java.time.format.DateTimeFormatter;
-                        import java.util.ArrayList;
-                        import java.util.List;
-
-                        // (Önceki kodda verilen tüm GestionnaireRapportTest sınıfı)
-                    '''
-
-                    // Check Java and Maven
                     sh '''
                         echo "========== Environment Check =========="
                         echo "JAVA_HOME = ${JAVA_HOME}"
                         echo "M2_HOME = ${M2_HOME}"
                         echo "PATH = ${PATH}"
 
+                        # Java kontrolü
                         if [ -z "$JAVA_HOME" ]; then
                             echo "ERROR: JAVA_HOME is not set!"
                             exit 1
                         fi
 
-                        java -version
-                        mvn -version
+                        if [ ! -x "${JAVA_HOME}/bin/java" ]; then
+                            echo "ERROR: Java executable not found!"
+                            exit 1
+                        fi
+
+                        echo "Java version:"
+                        "${JAVA_HOME}/bin/java" -version
+
+                        echo "Maven version:"
+                        "${M2_HOME}/bin/mvn" -version
+
+                        # Dizin yapısını oluştur
+                        mkdir -p ${CUCUMBER_REPORTS}
+                        mkdir -p ${ALLURE_RESULTS}
+                        mkdir -p ${EXCEL_REPORTS}
+                        mkdir -p target/screenshots
+                        mkdir -p src/test/java/utils
                     '''
                 }
             }
@@ -109,11 +72,11 @@ pipeline {
                     try {
                         echo "📦 Installing dependencies..."
 
-                        // Update pom.xml with required dependencies
+                        // Apache POI bağımlılıklarını kontrol et ve ekle
                         sh '''
                             if ! grep -q "org.apache.poi" pom.xml; then
-                                echo "Adding Apache POI dependency..."
-                                sed -i'' -e '/<dependencies>/a\\
+                                echo "Adding Apache POI dependencies..."
+                                sed -i '.bak' '/<dependencies>/a\\
                                     <dependency>\\
                                         <groupId>org.apache.poi</groupId>\\
                                         <artifactId>poi</artifactId>\\
@@ -128,9 +91,11 @@ pipeline {
                             fi
                         '''
 
-                        // Build project
                         sh """
-                            ${M2_HOME}/bin/mvn clean install -DskipTests
+                            ${M2_HOME}/bin/mvn clean install -DskipTests -B || {
+                                echo "Maven build failed!"
+                                exit 1
+                            }
                         """
                     } catch (Exception e) {
                         echo "ERROR in Build & Dependencies stage: ${e.getMessage()}"
@@ -145,19 +110,20 @@ pipeline {
                 script {
                     try {
                         echo "🧪 Running Tests..."
-
                         withEnv(["JAVA_HOME=${JAVA_HOME}"]) {
                             sh """
                                 ${M2_HOME}/bin/mvn test \
                                 -Dtest=runner.TestRunner \
+                                -DplatformName=Web \
+                                -Dbrowser=chrome \
                                 -Dcucumber.plugin="pretty,json:target/cucumber.json,html:${CUCUMBER_REPORTS},io.qameta.allure.cucumber7jvm.AllureCucumber7Jvm" \
                                 -Dcucumber.features="src/test/resources/features" \
-                                | tee execution.log
+                                -B | tee execution.log
                             """
                         }
                     } catch (Exception e) {
-                        currentBuild.result = 'FAILURE'
                         echo "ERROR in Test Execution: ${e.getMessage()}"
+                        currentBuild.result = 'FAILURE'
                         throw e
                     }
                 }
@@ -170,12 +136,11 @@ pipeline {
                     try {
                         echo "📊 Generating Reports..."
 
-                        // Generate Cucumber reports
+                        // Maven verify ve Allure raporu
                         sh """
                             ${M2_HOME}/bin/mvn verify -DskipTests
                         """
 
-                        // Generate Allure report
                         allure([
                             includeProperties: false,
                             jdk: '',
@@ -184,35 +149,38 @@ pipeline {
                             results: [[path: "${ALLURE_RESULTS}"]]
                         ])
 
-                        // Generate Excel report using GestionnaireRapportTest
+                        // Excel raporlarını arşivle
                         sh """
-                            echo "Generating Excel Report..."
-                            java -cp target/test-classes utils.GestionnaireRapportTest "RadioFrance_${TIMESTAMP}"
+                            if [ -d "${EXCEL_REPORTS}" ]; then
+                                echo "Archiving Excel reports from ${EXCEL_REPORTS}"
+                                cp ${EXCEL_REPORTS}/*.xlsx ${WORKSPACE}/
+                            else
+                                echo "No Excel reports found in ${EXCEL_REPORTS}"
+                            fi
                         """
 
                     } catch (Exception e) {
                         echo "ERROR in Report Generation: ${e.getMessage()}"
                         currentBuild.result = 'UNSTABLE'
+                        throw e
                     }
                 }
             }
             post {
                 always {
-                    // Archive test artifacts
                     archiveArtifacts artifacts: """
                         ${CUCUMBER_REPORTS}/**/*,
                         target/cucumber.json,
                         ${ALLURE_RESULTS}/**/*,
                         target/screenshots/**/*,
-                        target/rapports-tests/**/*,
+                        ${EXCEL_REPORTS}/**/*,
+                        *.xlsx,
                         execution.log
                     """, allowEmptyArchive: true
 
-                    // Publish Cucumber report
                     cucumber buildStatus: 'UNSTABLE',
                             fileIncludePattern: '**/cucumber.json',
-                            jsonReportDirectory: 'target',
-                            sortingMethod: 'ALPHABETICAL'
+                            jsonReportDirectory: 'target'
                 }
             }
         }
@@ -221,12 +189,7 @@ pipeline {
     post {
         always {
             script {
-                def testResults = ""
-                if (fileExists('execution.log')) {
-                    testResults = readFile('execution.log').trim()
-                } else {
-                    echo "Warning: execution.log not found"
-                }
+                def testResults = fileExists('execution.log') ? readFile('execution.log').trim() : "No test results available"
 
                 echo """
                     ╔══════════════════════════════════╗
@@ -236,41 +199,26 @@ pipeline {
                     📊 Test Results:
                     ${testResults}
 
-                    📝 Reports Available:
+                    📝 Reports:
                     - Cucumber Report: ${BUILD_URL}cucumber-html-reports/overview-features.html
                     - Allure Report: ${BUILD_URL}allure/
-                    - Excel Report: ${WORKSPACE}/target/rapports-tests/
+                    - Excel Reports: ${EXCEL_REPORTS}
 
                     Build Result: ${currentBuild.result ?: 'UNKNOWN'}
                     ${currentBuild.result == 'SUCCESS' ? '✅ SUCCESS' : '❌ FAILED'}
                 """
             }
-
             cleanWs notFailBuild: true
         }
 
-        success {
-            echo """
-                ✅ Build Successful!
-                Test execution completed successfully.
-                All reports have been generated.
-            """
-        }
-
         failure {
-            echo """
-                ❌ Build Failed!
-                Please check the logs for more details.
-                Last error: ${currentBuild.description ?: 'No error description available'}
-            """
-        }
-
-        unstable {
-            echo """
-                ⚠️ Build Unstable!
-                Some tests may have failed but the build completed.
-                Please check the test reports for details.
-            """
+            script {
+                echo """
+                    ❌ Build failed!
+                    Please check the logs for more details.
+                    Last error: ${currentBuild.description ?: 'No error description available'}
+                """
+            }
         }
     }
 }
