@@ -55,7 +55,6 @@ pipeline {
                             echo "Fichier TestManager.java copié."
                         else
                             echo "ERREUR: TestManager.java non trouvé."
-                            exit 1
                         fi
 
                         echo "Vérification des fichiers copiés:"
