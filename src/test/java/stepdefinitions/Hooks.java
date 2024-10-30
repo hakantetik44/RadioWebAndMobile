@@ -26,7 +26,6 @@ public class Hooks {
     public static final String URL_WEB = "https://www.radiofrance.fr/franceculture";
     protected WebDriverWait attente;
     private TestManager infosTest;
-    private TestManager rapportTest;
 
     @Before
     public void avantTout(Scenario scenario) throws MalformedURLException {
@@ -48,40 +47,33 @@ public class Hooks {
         }
     }
 
-
     @Given("Je lance l'application")
     public void lanceApp() throws MalformedURLException {
-
-        TestManager infosLancementApp = new TestManager();
-
-        infosLancementApp.setNomScenario("Nom du scénario de test");
-        infosLancementApp.setNomEtape("Début du Test");
-        infosLancementApp.setStatut("DÉMARRÉ");
-        infosLancementApp.setNomEtape("Lancement de l'Application");
+        infosTest.setNomEtape("Lancement de l'Application");
 
         try {
             if (OS.isAndroid()) {
                 System.out.println("Lancement de l'application Android : " + NOM_APK);
                 Driver.Android = Driver.getAndroidDriver(Driver.getAndroidApps());
-                infosLancementApp.setStatut("RÉUSSI");
-                infosLancementApp.setResultatReel("L'application Android a été lancée avec succès");
+                infosTest.setStatut("RÉUSSI");
+                infosTest.setResultatReel("L'application Android a été lancée avec succès");
             } else if (OS.isWeb()) {
                 System.out.println("Lancement de l'application web : " + URL_WEB);
                 Driver.Web = Driver.getWebDriver(ConfigReader.getProperty("browser"));
                 Driver.Web.get(URL_WEB);
-                this.attente = new WebDriverWait(Driver.Web, Duration.ofSeconds(1));
+                this.attente = new WebDriverWait(Driver.Web, Duration.ofSeconds(5)); // Increased wait time for loading
                 gererPopupsEtCookies();
-                infosLancementApp.setStatut("RÉUSSI");
-                infosLancementApp.setResultatReel("L'application web a été lancée avec succès");
-                infosLancementApp.setUrl(URL_WEB);
+                infosTest.setStatut("RÉUSSI");
+                infosTest.setResultatReel("L'application web a été lancée avec succès");
+                infosTest.setUrl(URL_WEB);
             }
         } catch (Exception e) {
-            infosLancementApp.setStatut("ÉCHOUÉ");
-            infosLancementApp.setMessageErreur("Erreur de lancement de l'application : " + e.getMessage());
+            infosTest.setStatut("ÉCHOUÉ");
+            infosTest.setMessageErreur("Erreur de lancement de l'application : " + e.getMessage());
             throw e;
         } finally {
             // Enregistrer les informations de lancement
-            infosTest.ajouterInfosTest(infosLancementApp);
+            TestManager.getInstance().ajouterInfosTest(infosTest);
         }
     }
 
@@ -126,7 +118,7 @@ public class Hooks {
             infosPopup.setMessageErreur("Avertissement lors du traitement des popups : " + e.getMessage());
         } finally {
             // Enregistrer les informations de popup
-            infosTest.ajouterInfosTest(infosPopup);
+            TestManager.getInstance().ajouterInfosTest(infosPopup);
         }
     }
 
@@ -161,7 +153,7 @@ public class Hooks {
             infosTest.setMessageErreur("Erreur lors de la fin du test : " + e.getMessage());
         } finally {
             // Générer le rapport de test
-            infosTest.genererRapport("RadioFrance");
+            TestManager.getInstance().genererRapport("RadioFrance");
             quitterDriver();
         }
     }

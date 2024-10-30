@@ -14,13 +14,13 @@ public class RadioStep {
     private TestManager testManager;
 
     public RadioStep() {
-        testManager = new TestManager();
-        testManager.setPlateforme("Web"); // Set platform
+        testManager = TestManager.getInstance(); // Use the singleton instance
     }
 
     @Then("Je vérifie que je suis sur la page d'accueil")
     public void verifierPageAccueil() {
         testManager.setNomEtape("Vérification de la page d'accueil");
+        testManager.setResultatAttendu("L'utilisateur doit être sur la page d'accueil."); // Set expected result
         try {
             String urlAttendue = "https://www.radiofrance.fr";
             String urlReelle = Driver.getCurrentDriver().getCurrentUrl();
@@ -55,7 +55,7 @@ public class RadioStep {
     @When("Je saisis {string} dans le champ de recherche")
     public void effectuerRecherche(String histoire) {
         testManager.setNomEtape("Effectuer une recherche");
-        testManager.setResultatAttendu("Le texte '" + histoire + "' doit être saisi dans le champ de recherche");
+        testManager.setResultatAttendu("Le texte '" + histoire + "' doit être saisi dans le champ de recherche."); // Set expected result
         try {
             pageRadio.effectuerRecherche(histoire);
             testManager.setStatut("RÉUSSI");
@@ -73,7 +73,7 @@ public class RadioStep {
     public void lesResultatsPourDoiventEtreAffiches(String histoire) throws InterruptedException {
         testManager.setNomEtape("Vérification des résultats de recherche");
         String urlAttendue = "https://www.radiofrance.fr/recherche";
-        testManager.setResultatAttendu("URL attendue : " + urlAttendue);
+        testManager.setResultatAttendu("URL attendue : " + urlAttendue); // Set expected result
 
         try {
             Thread.sleep(3000); // Wait for page to load
