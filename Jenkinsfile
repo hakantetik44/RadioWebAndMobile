@@ -39,9 +39,16 @@ pipeline {
                     cleanWs()
                     checkout scm
 
-                    def props = readProperties file: 'src/test/resources/configuration.properties'
-                    env.PLATFORM_NAME = params.PLATFORM_NAME ?: props.platformName ?: 'Web'
-                    env.BROWSER = params.PLATFORM_NAME == 'Web' ? (params.BROWSER ?: props.browser ?: 'chrome') : ''
+                    def configProps = sh(
+                        script: 'cat src/test/resources/configuration.properties',
+                        returnStdout: true
+                    ).trim().split('\n').collectEntries { line ->
+                        def parts = line.split('=')
+                        [(parts[0]): parts[1]]
+                    }
+
+                    env.PLATFORM_NAME = params.PLATFORM_NAME ?: configProps.platformName ?: 'Web'
+                    env.BROWSER = params.PLATFORM_NAME == 'Web' ? (params.BROWSER ?: configProps.browser ?: 'chrome') : ''
 
                     echo """Configuration:
                     • Plateforme: ${env.PLATFORM_NAME}
@@ -49,7 +56,6 @@ pipeline {
 
                     sh """
                         mkdir -p ${EXCEL_REPORTS} ${ALLURE_RESULTS} target/screenshots
-
                         export JAVA_HOME=${JAVA_HOME}
                         java -version
                         ${M2_HOME}/bin/mvn -version
