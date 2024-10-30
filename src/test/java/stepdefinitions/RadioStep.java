@@ -15,6 +15,7 @@ public class RadioStep {
 
     public RadioStep() {
         testManager = new TestManager();
+        testManager.setPlateforme("Web"); // Set platform
     }
 
     @Then("Je vérifie que je suis sur la page d'accueil")
@@ -23,7 +24,6 @@ public class RadioStep {
         try {
             String urlAttendue = "https://www.radiofrance.fr";
             String urlReelle = Driver.getCurrentDriver().getCurrentUrl();
-            // Vérifier si l'URL réelle commence par l'URL attendue
             assertTrue("L'utilisateur n'est pas sur la page d'accueil attendue.", urlReelle.startsWith(urlAttendue));
             testManager.setStatut("RÉUSSI");
             testManager.setResultatReel("L'utilisateur est sur la page d'accueil.");
@@ -38,9 +38,7 @@ public class RadioStep {
 
     @When("Je clique sur le bouton {string}")
     public void cliquerSurLeBouton(String nomBoutonRecherche) {
-        testManager = new TestManager();
         testManager.setNomEtape("Clic sur le bouton de recherche : " + nomBoutonRecherche);
-
         try {
             pageRadio.cliquerBtnRechercher();
             testManager.setStatut("RÉUSSI");
@@ -56,10 +54,8 @@ public class RadioStep {
 
     @When("Je saisis {string} dans le champ de recherche")
     public void effectuerRecherche(String histoire) {
-        testManager = new TestManager();
         testManager.setNomEtape("Effectuer une recherche");
         testManager.setResultatAttendu("Le texte '" + histoire + "' doit être saisi dans le champ de recherche");
-
         try {
             pageRadio.effectuerRecherche(histoire);
             testManager.setStatut("RÉUSSI");
@@ -75,21 +71,17 @@ public class RadioStep {
 
     @Then("Les résultats pour {string} doivent être affichés")
     public void lesResultatsPourDoiventEtreAffiches(String histoire) throws InterruptedException {
-        testManager = new TestManager();
         testManager.setNomEtape("Vérification des résultats de recherche");
-
         String urlAttendue = "https://www.radiofrance.fr/recherche";
         testManager.setResultatAttendu("URL attendue : " + urlAttendue);
 
         try {
-            Thread.sleep(3000); // Attendre que la page se charge
+            Thread.sleep(3000); // Wait for page to load
             String urlReelle = Driver.getCurrentDriver().getCurrentUrl();
             testManager.setResultatReel("URL actuelle : " + urlReelle);
-            testManager.setUrl(urlReelle);
+            testManager.setUrl(urlReelle); // Set the URL
 
-            // Vérifier que l'URL réelle commence par l'URL attendue
             assertTrue("L'URL actuelle ne commence pas par l'URL attendue.", urlReelle.startsWith(urlAttendue));
-
             testManager.setStatut("RÉUSSI");
         } catch (Exception e) {
             testManager.setStatut("ÉCHOUÉ");

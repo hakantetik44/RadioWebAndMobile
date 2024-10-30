@@ -4,18 +4,17 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class TestManager {
-    private static TestManager instance; // Instance unique
+    private static TestManager instance; // Unique instance
     private String nomScenario;
     private String nomEtape;
     private String statut;
-    private String plateforme;
+    private String plateforme; // Platform name
     private String resultatAttendu;
     private String resultatReel;
     private String url;
     private String messageErreur;
 
-    private List<TestManager> rapportsTests;
-
+    private List<TestManager> rapportsTests; // List of test reports
 
     public TestManager() {
         rapportsTests = new ArrayList<>();
@@ -57,7 +56,7 @@ public class TestManager {
     }
 
     public void setPlateforme(String plateforme) {
-        this.plateforme = plateforme;
+        this.plateforme = plateforme; // Set the platform name
     }
 
     public String getResultatAttendu() {
@@ -65,7 +64,7 @@ public class TestManager {
     }
 
     public void setResultatAttendu(String resultatAttendu) {
-        this.resultatAttendu = resultatAttendu;
+        this.resultatAttendu = resultatAttendu; // Set expected result
     }
 
     public String getResultatReel() {
@@ -73,7 +72,7 @@ public class TestManager {
     }
 
     public void setResultatReel(String resultatReel) {
-        this.resultatReel = resultatReel;
+        this.resultatReel = resultatReel; // Set actual result
     }
 
     public String getUrl() {
@@ -81,7 +80,7 @@ public class TestManager {
     }
 
     public void setUrl(String url) {
-        this.url = url;
+        this.url = url; // Set URL
     }
 
     public String getMessageErreur() {
@@ -89,11 +88,11 @@ public class TestManager {
     }
 
     public void setMessageErreur(String messageErreur) {
-        this.messageErreur = messageErreur;
+        this.messageErreur = messageErreur; // Set error message
     }
 
     public void ajouterInfosTest(TestManager testInfo) {
-        rapportsTests.add(testInfo);
+        rapportsTests.add(testInfo); // Add test info to the list
     }
 
     public void genererRapport(String nomRapport) {
@@ -102,11 +101,11 @@ public class TestManager {
             System.out.println("Nom du Scénario: " + info.getNomScenario());
             System.out.println("Nom de l'Étape: " + info.getNomEtape());
             System.out.println("Statut: " + info.getStatut());
-            System.out.println("Plateforme: " + info.getPlateforme());
-            System.out.println("Résultat Attendu: " + info.getResultatAttendu());
-            System.out.println("Résultat Réel: " + info.getResultatReel());
-            System.out.println("URL: " + info.getUrl());
-            System.out.println("Message d'Erreur: " + info.getMessageErreur());
+            System.out.println("Plateforme: " + info.getPlateforme()); // Print platform
+            System.out.println("Résultat Attendu: " + info.getResultatAttendu()); // Print expected result
+            System.out.println("Résultat Réel: " + info.getResultatReel()); // Print actual result
+            System.out.println("URL: " + info.getUrl()); // Print URL
+            System.out.println("Message d'Erreur: " + info.getMessageErreur()); // Print error message
             System.out.println("-----------------------------------");
         }
     }
