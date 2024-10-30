@@ -43,11 +43,22 @@ pipeline {
                         mkdir -p target/screenshots
                     '''
 
-                    // Copie des fichiers sources
+                    // Copie des fichiers sources avec vérification
                     sh """
                         echo "=== Copie des fichiers sources ==="
-                        cp '${SOURCE_PROJECT}/src/test/java/utils/TestInfo.java' src/test/java/utils/TestInfo.java
-                        cp '${SOURCE_PROJECT}/src/test/java/utils/TestReportManager.java' src/test/java/utils/TestReportManager.java
+                        if [ -f '${SOURCE_PROJECT}/src/test/java/utils/TestInfo.java' ]; then
+                            cp '${SOURCE_PROJECT}/src/test/java/utils/TestInfo.java' src/test/java/utils/
+                            echo "Fichier TestInfo.java copié."
+                        else
+                            echo "ERREUR: TestInfo.java non trouvé."
+                        fi
+
+                        if [ -f '${SOURCE_PROJECT}/src/test/java/utils/TestReportManager.java' ]; then
+                            cp '${SOURCE_PROJECT}/src/test/java/utils/TestReportManager.java' src/test/java/utils/
+                            echo "Fichier TestReportManager.java copié."
+                        else
+                            echo "ERREUR: TestReportManager.java non trouvé."
+                        fi
 
                         echo "Vérification des fichiers copiés:"
                         ls -l src/test/java/utils/
@@ -86,6 +97,7 @@ pipeline {
                         """
                     } catch (Exception e) {
                         echo "ERREUR lors de la construction: ${e.getMessage()}"
+                        currentBuild.result = 'FAILURE'
                         throw e
                     }
                 }
@@ -120,10 +132,7 @@ pipeline {
                 script {
                     try {
                         echo "📊 Génération des rapports..."
-
-                        sh """
-                            ${M2_HOME}/bin/mvn verify -DskipTests
-                        """
+                        sh "${M2_HOME}/bin/mvn verify -DskipTests"
 
                         allure([
                             includeProperties: false,
@@ -132,7 +141,6 @@ pipeline {
                             reportBuildPolicy: 'ALWAYS',
                             results: [[path: "${ALLURE_RESULTS}"]]
                         ])
-
                     } catch (Exception e) {
                         echo "ERREUR lors de la génération des rapports: ${e.getMessage()}"
                         currentBuild.result = 'UNSTABLE'

@@ -16,12 +16,11 @@ public class TestManager {
 
     private List<TestManager> rapportsTests;
 
-    // Constructeur privé pour empêcher l'instanciation directe
+
     public TestManager() {
         rapportsTests = new ArrayList<>();
     }
 
-    // Méthode pour obtenir l'instance unique
     public static TestManager getInstance() {
         if (instance == null) {
             instance = new TestManager();
@@ -29,7 +28,6 @@ public class TestManager {
         return instance;
     }
 
-    // Getters et Setters
     public String getNomScenario() {
         return nomScenario;
     }
