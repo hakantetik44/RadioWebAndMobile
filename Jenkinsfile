@@ -4,15 +4,14 @@ pipeline {
     tools {
         maven 'maven'
         jdk 'JDK17'
-        allure 'Allure'
     }
 
     environment {
-        JAVA_HOME = "/usr/local/opt/openjdk@17"
+        JAVA_HOME = '/usr/local/opt/openjdk@17'
         M2_HOME = tool 'maven'
         PATH = "${JAVA_HOME}/bin:${M2_HOME}/bin:${PATH}"
-        MAVEN_OPTS = '-Xmx3072m'
-        PROJECT_NAME = 'Radio BDD Automation Tests'
+        MAVEN_OPTS = '-Xmx3072m'  // MaxPermSize kaldırıldı
+        PROJECT_NAME = 'Radio BDD Automations Tests'
         TIMESTAMP = new Date().format('yyyy-MM-dd_HH-mm-ss')
         CUCUMBER_REPORTS = 'target/cucumber-reports'
         ALLURE_RESULTS = 'target/allure-results'
@@ -46,6 +45,7 @@ pipeline {
                 sh """
                     export JAVA_HOME=/usr/local/opt/openjdk@17
                     ${M2_HOME}/bin/mvn clean install -DskipTests
+                    ${M2_HOME}/bin/mvn checkstyle:check
                 """
             }
         }
@@ -53,29 +53,19 @@ pipeline {
         stage('Run Tests') {
             steps {
                 script {
-                    echo "🚀 Running Tests..."
-                    sh """
-                        export JAVA_HOME=/usr/local/opt/openjdk@17
-                        ${M2_HOME}/bin/mvn test \
-                        -Dtest=runner.TestRunner \
-                        -Dcucumber.plugin="pretty,json:target/cucumber.json,io.qameta.allure.cucumber7jvm.AllureCucumber7Jvm" \
-                        -Dwebdriver.chrome.headless=true \
-                        -Dwebdriver.chrome.args="--headless,--disable-gpu,--window-size=1920,1080" \
-                        | tee test-output.txt
-
-                        # Test sonuçlarını formatla
-                        cat test-output.txt | while IFS= read -r line; do
-                            if [[ \$line == *"Given"* ]] || [[ \$line == *"When"* ]] || [[ \$line == *"Then"* ]] || [[ \$line == *"And"* ]]; then
-                                echo "✅ \$line" >> execution.log
-                            elif [[ \$line == *"pop-up not found"* ]] || [[ \$line == *"already closed"* ]] || [[ \$line == *"already declined"* ]] || [[ \$line == *"already accepted"* ]]; then
-                                echo "ℹ️ \$line" >> execution.log
-                            elif [[ \$line == *"expectedUrl"* ]] || [[ \$line == *"actualUrl"* ]]; then
-                                echo "🔍 \$line" >> execution.log
-                            else
-                                echo "\$line" >> execution.log
-                            fi
-                        done
-                    """
+                    try {
+                        echo "🚀 Running Tests..."
+                        sh """
+                            export JAVA_HOME=/usr/local/opt/openjdk@17
+                            ${M2_HOME}/bin/mvn test \
+                            -Dtest=runner.TestRunner \
+                            -Dcucumber.plugin="pretty,json:target/cucumber.json,utils.formatter.PrettyReports:target/cucumber-pretty-reports,io.qameta.allure.cucumber7jvm.AllureCucumber7Jvm" \
+                            | tee execution.log
+                        """
+                    } catch (Exception e) {
+                        currentBuild.result = 'FAILURE'
+                        throw e
+                    }
                 }
             }
         }
@@ -83,11 +73,14 @@ pipeline {
         stage('Generate Reports') {
             steps {
                 script {
+                    // Cucumber Reports
                     sh """
                         export JAVA_HOME=/usr/local/opt/openjdk@17
                         ${M2_HOME}/bin/mvn verify -DskipTests
+                        mkdir -p ${CUCUMBER_REPORTS}
                     """
 
+                    // Allure Report
                     allure([
                         includeProperties: false,
                         jdk: '',
@@ -100,7 +93,7 @@ pipeline {
             post {
                 always {
                     archiveArtifacts artifacts: """
-                        target/cucumber-reports/**/*,
+                        target/cucumber-pretty-reports/**/*,
                         target/cucumber.json,
                         target/allure-results/**/*,
                         target/screenshots/**/*,
@@ -116,7 +109,7 @@ pipeline {
     }
 
     post {
-        success {
+        always {
             script {
                 def testResults = ""
                 if (fileExists('execution.log')) {
@@ -135,36 +128,9 @@ pipeline {
                     - Cucumber Report: ${BUILD_URL}cucumber-html-reports/overview-features.html
                     - Allure Report: ${BUILD_URL}allure/
 
-                    ✅ Tests Completed Successfully!
-
-                    Test Steps Summary:
-                    ==================
-                    ✅ Given/When/Then/And steps completed
-                    ℹ️ Informational messages (pop-ups, cookies)
-                    🔍 URL verifications
+                    ${currentBuild.result == 'SUCCESS' ? '✅ SUCCESS' : '❌ FAILED'}
                 """
             }
-        }
-        failure {
-            script {
-                def testResults = ""
-                if (fileExists('execution.log')) {
-                    testResults = readFile('execution.log').trim()
-                }
-
-                echo """
-                    ╔══════════════════════════════════╗
-                    ║       Test Execution Failed      ║
-                    ╚══════════════════════════════════╝
-
-                    📊 Test Results:
-                    ${testResults}
-
-                    ❌ FAILED: Check the logs for details
-                """
-            }
-        }
-        always {
             cleanWs()
         }
     }
