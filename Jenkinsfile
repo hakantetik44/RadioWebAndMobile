@@ -18,6 +18,10 @@ pipeline {
         ALLURE_RESULTS = 'target/allure-results'
         EXCEL_REPORTS = 'target/rapports-tests'
         SOURCE_PROJECT = '/Users/hakan/IdeaProjects/RadioWebAndMobile'
+
+        // Dynamic platform variables
+        PLATFORM_NAME = "Web"  // Default value, change as necessary
+        BROWSER = "chrome"      // Default value, change as necessary
     }
 
     stages {
@@ -33,7 +37,7 @@ pipeline {
                     cleanWs()
                     checkout scm
 
-                    // Création des répertoires nécessaires
+                    // Create necessary directories
                     sh '''
                         echo "=== Création des répertoires ==="
                         mkdir -p src/test/java/utils
@@ -43,7 +47,7 @@ pipeline {
                         mkdir -p target/screenshots
                     '''
 
-                    // Copie du fichier TestManager
+                    // Copy TestManager file
                     sh """
                         echo "=== Copie du fichier TestManager ==="
                         if [ -f '${SOURCE_PROJECT}/src/test/java/utils/TestManager.java' ]; then
@@ -105,8 +109,8 @@ pipeline {
                         sh """
                             ${M2_HOME}/bin/mvn test \
                             -Dtest=runner.TestRunner \
-                            -DplatformName=Web \
-                            -Dbrowser=chrome \
+                            -DplatformName=${PLATFORM_NAME} \
+                            -Dbrowser=${BROWSER} \
                             -Dcucumber.plugin="pretty,json:target/cucumber.json,html:${CUCUMBER_REPORTS},io.qameta.allure.cucumber7jvm.AllureCucumber7Jvm" \
                             -Dcucumber.features="src/test/resources/features" \
                             -B | tee execution.log
@@ -180,18 +184,12 @@ pipeline {
                     - Rapports Excel: ${EXCEL_REPORTS}
 
                     Résultat: ${currentBuild.result ?: 'INCONNU'}
+                    Plateforme: ${PLATFORM_NAME}
+                    Navigateur: ${BROWSER}
                     ${currentBuild.result == 'SUCCESS' ? '✅ SUCCÈS' : '❌ ÉCHEC'}
                 """
             }
             cleanWs notFailBuild: true
         }
 
-        failure {
-            echo """
-                ❌ Échec de la construction!
-                Veuillez consulter les logs pour plus de détails.
-                Dernière erreur: ${currentBuild.description ?: 'Aucune description d\'erreur disponible'}
-            """
-        }
-    }
-}
+
