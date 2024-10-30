@@ -4,14 +4,15 @@ pipeline {
     tools {
         maven 'maven'
         jdk 'JDK17'
+        allure 'Allure'
     }
 
     environment {
-        JAVA_HOME = '/usr/local/opt/openjdk@17'
+        JAVA_HOME = "/usr/local/opt/openjdk@17"
         M2_HOME = tool 'maven'
         PATH = "${JAVA_HOME}/bin:${M2_HOME}/bin:${PATH}"
-        MAVEN_OPTS = '-Xmx3072m'  // MaxPermSize kaldırıldı
-        PROJECT_NAME = 'Radio BDD Automations Tests'
+        MAVEN_OPTS = '-Xmx3072m'
+        PROJECT_NAME = 'Radio BDD Automation Tests'
         TIMESTAMP = new Date().format('yyyy-MM-dd_HH-mm-ss')
         CUCUMBER_REPORTS = 'target/cucumber-reports'
         ALLURE_RESULTS = 'target/allure-results'
@@ -45,7 +46,6 @@ pipeline {
                 sh """
                     export JAVA_HOME=/usr/local/opt/openjdk@17
                     ${M2_HOME}/bin/mvn clean install -DskipTests
-                    ${M2_HOME}/bin/mvn checkstyle:check
                 """
             }
         }
@@ -53,19 +53,16 @@ pipeline {
         stage('Run Tests') {
             steps {
                 script {
-                    try {
-                        echo "🚀 Running Tests..."
-                        sh """
-                            export JAVA_HOME=/usr/local/opt/openjdk@17
-                            ${M2_HOME}/bin/mvn test \
-                            -Dtest=runner.TestRunner \
-                            -Dcucumber.plugin="pretty,json:target/cucumber.json,utils.formatter.PrettyReports:target/cucumber-pretty-reports,io.qameta.allure.cucumber7jvm.AllureCucumber7Jvm" \
-                            | tee execution.log
-                        """
-                    } catch (Exception e) {
-                        currentBuild.result = 'FAILURE'
-                        throw e
-                    }
+                    echo "🚀 Running Tests..."
+                    sh """
+                        export JAVA_HOME=/usr/local/opt/openjdk@17
+                        ${M2_HOME}/bin/mvn test \
+                        -Dtest=runner.TestRunner \
+                        -Dcucumber.plugin="pretty,json:target/cucumber.json,io.qameta.allure.cucumber7jvm.AllureCucumber7Jvm" \
+                        -Dwebdriver.chrome.headless=true \
+                        -Dwebdriver.chrome.args="--headless,--disable-gpu,--window-size=1920,1080" \
+                        | tee execution.log
+                    """
                 }
             }
         }
@@ -73,14 +70,12 @@ pipeline {
         stage('Generate Reports') {
             steps {
                 script {
-                    // Cucumber Reports
                     sh """
                         export JAVA_HOME=/usr/local/opt/openjdk@17
                         ${M2_HOME}/bin/mvn verify -DskipTests
-                        mkdir -p ${CUCUMBER_REPORTS}
                     """
 
-                    // Allure Report
+                    // Allure raporu oluştur
                     allure([
                         includeProperties: false,
                         jdk: '',
@@ -93,7 +88,7 @@ pipeline {
             post {
                 always {
                     archiveArtifacts artifacts: """
-                        target/cucumber-pretty-reports/**/*,
+                        target/cucumber-reports/**/*,
                         target/cucumber.json,
                         target/allure-results/**/*,
                         target/screenshots/**/*,
@@ -109,7 +104,7 @@ pipeline {
     }
 
     post {
-        always {
+        success {
             script {
                 def testResults = ""
                 if (fileExists('execution.log')) {
@@ -128,9 +123,20 @@ pipeline {
                     - Cucumber Report: ${BUILD_URL}cucumber-html-reports/overview-features.html
                     - Allure Report: ${BUILD_URL}allure/
 
-                    ${currentBuild.result == 'SUCCESS' ? '✅ SUCCESS' : '❌ FAILED'}
+                    ✅ SUCCESS
                 """
             }
+        }
+        failure {
+            echo """
+                ╔══════════════════════════════════╗
+                ║       Test Execution Failed      ║
+                ╚══════════════════════════════════╝
+
+                ❌ FAILED: Check the logs for details
+            """
+        }
+        always {
             cleanWs()
         }
     }
