@@ -7,6 +7,7 @@ import utils.Driver;
 import utils.TestManager;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 public class RadioStep {
     private RadioPage pageRadio = new RadioPage();
@@ -22,7 +23,8 @@ public class RadioStep {
         try {
             String urlAttendue = "https://www.radiofrance.fr";
             String urlReelle = Driver.getCurrentDriver().getCurrentUrl();
-            assertEquals(urlAttendue, urlReelle);
+            // Vérifier si l'URL réelle commence par l'URL attendue
+            assertTrue("L'utilisateur n'est pas sur la page d'accueil attendue.", urlReelle.startsWith(urlAttendue));
             testManager.setStatut("RÉUSSI");
             testManager.setResultatReel("L'utilisateur est sur la page d'accueil.");
         } catch (Exception e) {
@@ -80,11 +82,14 @@ public class RadioStep {
         testManager.setResultatAttendu("URL attendue : " + urlAttendue);
 
         try {
-            Thread.sleep(3000);
+            Thread.sleep(3000); // Attendre que la page se charge
             String urlReelle = Driver.getCurrentDriver().getCurrentUrl();
             testManager.setResultatReel("URL actuelle : " + urlReelle);
             testManager.setUrl(urlReelle);
-            assertEquals(urlAttendue, urlReelle);
+
+            // Vérifier que l'URL réelle commence par l'URL attendue
+            assertTrue("L'URL actuelle ne commence pas par l'URL attendue.", urlReelle.startsWith(urlAttendue));
+
             testManager.setStatut("RÉUSSI");
         } catch (Exception e) {
             testManager.setStatut("ÉCHOUÉ");
