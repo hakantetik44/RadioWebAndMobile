@@ -45,7 +45,7 @@ pipeline {
             steps {
                 sh """
                     export JAVA_HOME=/usr/local/opt/openjdk@17
-                    ${M2_HOME}/bin/mvn clean install -DskipTests
+                    ${M2_HOME}/bin/mvn clean install -DskipTests -B -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
                 """
             }
         }
@@ -61,23 +61,24 @@ pipeline {
                         -Dcucumber.plugin="pretty,json:target/cucumber.json,io.qameta.allure.cucumber7jvm.AllureCucumber7Jvm" \
                         -Dwebdriver.chrome.headless=true \
                         -Dwebdriver.chrome.args="--headless,--disable-gpu,--window-size=1920,1080" \
+                        -B -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn \
                         | tee test-output.txt
 
-                        # Format test results with status indicators
+                        # Format test steps with status indicators
                         cat test-output.txt | while IFS= read -r line; do
-                            if [[ \$line == *"passed"* ]] && ([[ \$line == *"Given"* ]] || [[ \$line == *"When"* ]] || [[ \$line == *"Then"* ]] || [[ \$line == *"And"* ]]); then
+                            if [[ \$line =~ "passed" ]] && ([[ \$line =~ "Given" ]] || [[ \$line =~ "When" ]] || [[ \$line =~ "Then" ]] || [[ \$line =~ "And" ]]); then
                                 echo "💚 \$line" >> execution.log
-                            elif [[ \$line == *"failed"* ]] && ([[ \$line == *"Given"* ]] || [[ \$line == *"When"* ]] || [[ \$line == *"Then"* ]] || [[ \$line == *"And"* ]]); then
+                            elif [[ \$line =~ "failed" ]] && ([[ \$line =~ "Given" ]] || [[ \$line =~ "When" ]] || [[ \$line =~ "Then" ]] || [[ \$line =~ "And" ]]); then
                                 echo "❌ \$line" >> execution.log
-                            elif [[ \$line == *"skipped"* ]] && ([[ \$line == *"Given"* ]] || [[ \$line == *"When"* ]] || [[ \$line == *"Then"* ]] || [[ \$line == *"And"* ]]); then
+                            elif [[ \$line =~ "skipped" ]] && ([[ \$line =~ "Given" ]] || [[ \$line =~ "When" ]] || [[ \$line =~ "Then" ]] || [[ \$line =~ "And" ]]); then
                                 echo "⏭️ \$line" >> execution.log
-                            elif [[ \$line == *"pending"* ]] && ([[ \$line == *"Given"* ]] || [[ \$line == *"When"* ]] || [[ \$line == *"Then"* ]] || [[ \$line == *"And"* ]]); then
+                            elif [[ \$line =~ "pending" ]] && ([[ \$line =~ "Given" ]] || [[ \$line =~ "When" ]] || [[ \$line =~ "Then" ]] || [[ \$line =~ "And" ]]); then
                                 echo "⏳ \$line" >> execution.log
-                            elif [[ \$line == *"pop-up not found"* ]] || [[ \$line == *"already closed"* ]] || [[ \$line == *"already declined"* ]] || [[ \$line == *"already accepted"* ]]; then
-                                echo "ℹ️ \$line" >> execution.log
-                            elif [[ \$line == *"expectedUrl"* ]] || [[ \$line == *"actualUrl"* ]]; then
+                            elif [[ \$line =~ "expectedUrl" ]] || [[ \$line =~ "actualUrl" ]]; then
                                 echo "🔍 \$line" >> execution.log
-                            else
+                            elif [[ \$line =~ "BUILD SUCCESS" ]] || [[ \$line =~ "BUILD FAILURE" ]]; then
+                                echo "\$line" >> execution.log
+                            elif [[ \$line =~ "Tests run:" ]]; then
                                 echo "\$line" >> execution.log
                             fi
                         done
@@ -91,7 +92,7 @@ pipeline {
                 script {
                     sh """
                         export JAVA_HOME=/usr/local/opt/openjdk@17
-                        ${M2_HOME}/bin/mvn verify -DskipTests
+                        ${M2_HOME}/bin/mvn verify -DskipTests -B
                     """
 
                     allure([
@@ -124,66 +125,38 @@ pipeline {
     post {
         success {
             script {
-                def testResults = ""
-                if (fileExists('execution.log')) {
-                    testResults = readFile('execution.log').trim()
-                }
+                def testResults = fileExists('execution.log') ? readFile('execution.log').trim() : "No test results available"
 
-                echo """
-                    ╔══════════════════════════════════╗
-                    ║       Test Execution Summary     ║
-                    ╚══════════════════════════════════╝
+                echo """╔══════════════════════════════════╗
+║       Test Execution Summary     ║
+╚══════════════════════════════════╝
 
-                    📊 Test Results:
-                    ${testResults}
+📊 Test Results:
+${testResults}
 
-                    📝 Reports:
-                    - Cucumber Report: ${BUILD_URL}cucumber-html-reports/overview-features.html
-                    - Allure Report: ${BUILD_URL}allure/
+📝 Reports:
+- Cucumber Report: ${BUILD_URL}cucumber-html-reports/overview-features.html
+- Allure Report: ${BUILD_URL}allure/
 
-                    ✅ Tests Completed Successfully!
-
-                    Test Steps Legend:
-                    ==================
-                    💚 Passed steps
-                    ❌ Failed steps
-                    ⏭️ Skipped steps
-                    ⏳ Pending steps
-                    ℹ️ Informational messages
-                    🔍 URL verifications
-                """
+✅ Tests Completed Successfully!"""
             }
+            cleanWs notFailBuild: true
         }
+
         failure {
             script {
-                def testResults = ""
-                if (fileExists('execution.log')) {
-                    testResults = readFile('execution.log').trim()
-                }
+                def testResults = fileExists('execution.log') ? readFile('execution.log').trim() : "No test results available"
 
-                echo """
-                    ╔══════════════════════════════════╗
-                    ║       Test Execution Failed      ║
-                    ╚══════════════════════════════════╝
+                echo """╔══════════════════════════════════╗
+║       Test Execution Failed      ║
+╚══════════════════════════════════╝
 
-                    📊 Test Results:
-                    ${testResults}
+📊 Test Results:
+${testResults}
 
-                    ❌ FAILED: Check the logs for details
-
-                    Test Steps Legend:
-                    ==================
-                    💚 Passed steps
-                    ❌ Failed steps
-                    ⏭️ Skipped steps
-                    ⏳ Pending steps
-                    ℹ️ Informational messages
-                    🔍 URL verifications
-                """
+❌ FAILED: Check the logs for details"""
             }
-        }
-        always {
-            cleanWs()
+            cleanWs notFailBuild: true
         }
     }
 }
