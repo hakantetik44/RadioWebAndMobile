@@ -63,10 +63,16 @@ pipeline {
                         -Dwebdriver.chrome.args="--headless,--disable-gpu,--window-size=1920,1080" \
                         | tee test-output.txt
 
-                        # Test sonuçlarını formatla
+                        # Format test results with status indicators
                         cat test-output.txt | while IFS= read -r line; do
-                            if [[ \$line == *"Given"* ]] || [[ \$line == *"When"* ]] || [[ \$line == *"Then"* ]] || [[ \$line == *"And"* ]]; then
-                                echo "✅ \$line" >> execution.log
+                            if [[ \$line == *"passed"* ]] && ([[ \$line == *"Given"* ]] || [[ \$line == *"When"* ]] || [[ \$line == *"Then"* ]] || [[ \$line == *"And"* ]]); then
+                                echo "💚 \$line" >> execution.log
+                            elif [[ \$line == *"failed"* ]] && ([[ \$line == *"Given"* ]] || [[ \$line == *"When"* ]] || [[ \$line == *"Then"* ]] || [[ \$line == *"And"* ]]); then
+                                echo "❌ \$line" >> execution.log
+                            elif [[ \$line == *"skipped"* ]] && ([[ \$line == *"Given"* ]] || [[ \$line == *"When"* ]] || [[ \$line == *"Then"* ]] || [[ \$line == *"And"* ]]); then
+                                echo "⏭️ \$line" >> execution.log
+                            elif [[ \$line == *"pending"* ]] && ([[ \$line == *"Given"* ]] || [[ \$line == *"When"* ]] || [[ \$line == *"Then"* ]] || [[ \$line == *"And"* ]]); then
+                                echo "⏳ \$line" >> execution.log
                             elif [[ \$line == *"pop-up not found"* ]] || [[ \$line == *"already closed"* ]] || [[ \$line == *"already declined"* ]] || [[ \$line == *"already accepted"* ]]; then
                                 echo "ℹ️ \$line" >> execution.log
                             elif [[ \$line == *"expectedUrl"* ]] || [[ \$line == *"actualUrl"* ]]; then
@@ -137,10 +143,13 @@ pipeline {
 
                     ✅ Tests Completed Successfully!
 
-                    Test Steps Summary:
+                    Test Steps Legend:
                     ==================
-                    ✅ Given/When/Then/And steps completed
-                    ℹ️ Informational messages (pop-ups, cookies)
+                    💚 Passed steps
+                    ❌ Failed steps
+                    ⏭️ Skipped steps
+                    ⏳ Pending steps
+                    ℹ️ Informational messages
                     🔍 URL verifications
                 """
             }
@@ -161,6 +170,15 @@ pipeline {
                     ${testResults}
 
                     ❌ FAILED: Check the logs for details
+
+                    Test Steps Legend:
+                    ==================
+                    💚 Passed steps
+                    ❌ Failed steps
+                    ⏭️ Skipped steps
+                    ⏳ Pending steps
+                    ℹ️ Informational messages
+                    🔍 URL verifications
                 """
             }
         }
