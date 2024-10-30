@@ -43,21 +43,14 @@ pipeline {
                         mkdir -p target/screenshots
                     '''
 
-                    // Copie des fichiers sources avec vérification
+                    // Copie du fichier TestManager
                     sh """
-                        echo "=== Copie des fichiers sources ==="
-                        if [ -f '${SOURCE_PROJECT}/src/test/java/utils/TestInfo.java' ]; then
-                            cp '${SOURCE_PROJECT}/src/test/java/utils/TestInfo.java' src/test/java/utils/
-                            echo "Fichier TestInfo.java copié."
+                        echo "=== Copie du fichier TestManager ==="
+                        if [ -f '${SOURCE_PROJECT}/src/test/java/utils/TestManager.java' ]; then
+                            cp '${SOURCE_PROJECT}/src/test/java/utils/TestManager.java' src/test/java/utils/
+                            echo "Fichier TestManager.java copié."
                         else
-                            echo "ERREUR: TestInfo.java non trouvé."
-                        fi
-
-                        if [ -f '${SOURCE_PROJECT}/src/test/java/utils/TestReportManager.java' ]; then
-                            cp '${SOURCE_PROJECT}/src/test/java/utils/TestReportManager.java' src/test/java/utils/
-                            echo "Fichier TestReportManager.java copié."
-                        else
-                            echo "ERREUR: TestReportManager.java non trouvé."
+                            echo "ERREUR: TestManager.java non trouvé."
                         fi
 
                         echo "Vérification des fichiers copiés:"
