@@ -20,8 +20,8 @@ pipeline {
         SOURCE_PROJECT = '/Users/hakan/IdeaProjects/RadioWebAndMobile'
 
         // Dynamic platform variables
-        PLATFORM_NAME = "Web"  // Default value, change as necessary
-        BROWSER = "chrome"      // Default value, change as necessary
+        PLATFORM_NAME = "Web"  // Default value
+        BROWSER = "chrome"      // Default value
     }
 
     stages {
@@ -192,4 +192,12 @@ pipeline {
             cleanWs notFailBuild: true
         }
 
-
+        failure {
+            echo """
+                ❌ Échec de la construction!
+                Veuillez consulter les logs pour plus de détails.
+                Dernière erreur: ${currentBuild.description ?: 'Aucune description d\'erreur disponible'}
+            """
+        }
+    }
+}
