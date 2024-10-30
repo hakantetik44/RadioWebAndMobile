@@ -30,7 +30,7 @@ public class Hooks {
     @Before
     public void avantTout(Scenario scenario) throws MalformedURLException {
         // Initialiser les informations pour le rapport de test
-        infosTest = new TestManager();
+        infosTest =new TestManager();
         infosTest.setNomScenario(scenario.getName());
         infosTest.setNomEtape("Début du Test");
         infosTest.setStatut("DÉMARRÉ");

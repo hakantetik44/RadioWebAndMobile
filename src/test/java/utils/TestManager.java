@@ -16,7 +16,7 @@ public class TestManager {
 
     private List<TestManager> rapportsTests; // List of test reports
 
-    private TestManager() {
+    public TestManager() {
         rapportsTests = new ArrayList<>();
     }
 
