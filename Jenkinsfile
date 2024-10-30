@@ -2,38 +2,50 @@ pipeline {
     agent any
 
     tools {
-        maven 'maven'
-        jdk 'JDK17'
-        allure 'Allure'
+        maven 'maven' // Jenkins üzerinde tanımlı Maven
+        jdk 'JDK17' // Jenkins üzerinde tanımlı olan JDK17
+        allure 'Allure' // Jenkins üzerinde tanımlı Allure
     }
 
     environment {
-        JAVA_HOME = "/usr/local/opt/openjdk@17"
-        M2_HOME = tool 'maven'
-        PATH = "${JAVA_HOME}/bin:${M2_HOME}/bin:${PATH}"
+        JAVA_HOME = "/usr/local/opt/openjdk@17" // Güncellenmiş JAVA_HOME
+        M2_HOME = tool 'maven' // Maven'ı Jenkins'ten al
+        PATH = "${JAVA_HOME}/bin:${M2_HOME}/bin:${PATH}" // Doğru PATH ayarı
         MAVEN_OPTS = '-Xmx3072m'
         PROJECT_NAME = 'Radio BDD Automation Tests'
         TIMESTAMP = new Date().format('yyyy-MM-dd_HH-mm-ss')
         CUCUMBER_REPORTS = 'target/cucumber-reports'
         ALLURE_RESULTS = 'target/allure-results'
-        PDF_REPORT = "Test_Report_${TIMESTAMP}.pdf"
     }
 
     stages {
         stage('Initialize') {
             steps {
                 script {
-                    echo "Initializing Test Environment"
+                    echo """
+                        ╔══════════════════════════════════╗
+                        ║      Test Automation Start       ║
+                        ╚══════════════════════════════════╝
+                    """
                 }
                 cleanWs()
                 checkout scm
 
                 sh '''
-                    echo "Checking JAVA_HOME and Maven"
+                    echo "JAVA_HOME = ${JAVA_HOME}"
+                    echo "M2_HOME = ${M2_HOME}"
+                    echo "PATH = ${PATH}"
+
                     if [ -z "$JAVA_HOME" ]; then
                         echo "JAVA_HOME is not set!"
                         exit 1
                     fi
+
+                    if [ ! -x "${JAVA_HOME}/bin/java" ]; then
+                        echo "Java is not available in JAVA_HOME!"
+                        exit 1
+                    fi
+
                     java -version
                     mvn -version || { echo "Maven is not available!"; exit 1; }
                 '''
@@ -50,20 +62,17 @@ pipeline {
             steps {
                 script {
                     try {
-                        echo "Running Tests..."
+                        echo "🚀 Running Tests..."
                         withEnv(["JAVA_HOME=${JAVA_HOME}"]) {
                             sh """
                                 ${M2_HOME}/bin/mvn test \
                                 -Dtest=runner.TestRunner \
                                 -Dcucumber.plugin="pretty,json:target/cucumber.json,io.qameta.allure.cucumber7jvm.AllureCucumber7Jvm" \
-                                -Dwebdriver.chrome.headless=true \
-                                -Dwebdriver.chrome.args="--headless,--disable-gpu,--window-size=1920,1080" \
                                 | tee execution.log
                             """
                         }
                     } catch (Exception e) {
                         currentBuild.result = 'FAILURE'
-                        echo "An error occurred: ${e.message}"
                         throw e
                     }
                 }
@@ -75,7 +84,9 @@ pipeline {
                 script {
                     sh """
                         ${M2_HOME}/bin/mvn verify -DskipTests
+                        mkdir -p ${CUCUMBER_REPORTS}
                     """
+
                     allure([
                         includeProperties: false,
                         jdk: '',
@@ -83,11 +94,6 @@ pipeline {
                         reportBuildPolicy: 'ALWAYS',
                         results: [[path: ALLURE_RESULTS]]
                     ])
-
-                    echo "Generating PDF Report..."
-                    sh """
-                        wkhtmltopdf ${BUILD_URL}cucumber-html-reports/overview-features.html ${PDF_REPORT}
-                    """
                 }
             }
             post {
@@ -97,8 +103,7 @@ pipeline {
                         target/cucumber.json,
                         ${ALLURE_RESULTS}/**/*,
                         target/screenshots/**/*,
-                        execution.log,
-                        ${PDF_REPORT}
+                        execution.log
                     """, allowEmptyArchive: true
 
                     cucumber buildStatus: 'UNSTABLE',
@@ -118,15 +123,19 @@ pipeline {
                 }
 
                 echo """
-                    Test Execution Summary:
+                    ╔══════════════════════════════════╗
+                    ║       Test Execution Summary     ║
+                    ╚══════════════════════════════════╝
+
+                    📊 Test Results:
                     ${testResults}
 
-                    Reports:
+                    📝 Reports:
                     - Cucumber Report: ${BUILD_URL}cucumber-html-reports/overview-features.html
                     - Allure Report: ${BUILD_URL}allure/
-                    - PDF Report: ${BUILD_URL}${PDF_REPORT}
 
-
+                    ${currentBuild.result == 'SUCCESS' ? '✅ SUCCESS' : '❌ FAILED'}
+                """
             }
             cleanWs()
         }
