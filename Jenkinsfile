@@ -30,14 +30,6 @@ pipeline {
                 }
                 cleanWs()
                 checkout scm
-
-                sh '''
-                    export JAVA_HOME=/usr/local/opt/openjdk@17
-                    echo "JAVA_HOME = ${JAVA_HOME}"
-                    echo "M2_HOME = ${M2_HOME}"
-                    java -version
-                    ${M2_HOME}/bin/mvn -version
-                '''
             }
         }
 
@@ -45,7 +37,11 @@ pipeline {
             steps {
                 sh """
                     export JAVA_HOME=/usr/local/opt/openjdk@17
-                    ${M2_HOME}/bin/mvn clean install -DskipTests -B -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
+                    ${M2_HOME}/bin/mvn clean install -DskipTests \
+                    -B -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=error \
+                    -Dorg.slf4j.simpleLogger.showDateTime=false \
+                    -Dorg.slf4j.simpleLogger.showThreadName=false \
+                    --no-transfer-progress
                 """
             }
         }
@@ -54,35 +50,60 @@ pipeline {
             steps {
                 script {
                     echo "🚀 Running Tests..."
-                    sh """
+                    sh '''
                         export JAVA_HOME=/usr/local/opt/openjdk@17
+
+                        # Çıktıyı geçici bir dosyaya yönlendir
                         ${M2_HOME}/bin/mvn test \
                         -Dtest=runner.TestRunner \
                         -Dcucumber.plugin="pretty,json:target/cucumber.json,io.qameta.allure.cucumber7jvm.AllureCucumber7Jvm" \
                         -Dwebdriver.chrome.headless=true \
                         -Dwebdriver.chrome.args="--headless,--disable-gpu,--window-size=1920,1080" \
-                        -B -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn \
-                        | tee test-output.txt
+                        -B -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=error \
+                        -Dorg.slf4j.simpleLogger.showDateTime=false \
+                        -Dorg.slf4j.simpleLogger.showThreadName=false \
+                        --no-transfer-progress > temp_output.txt 2>&1
 
-                        # Format test steps with status indicators
-                        cat test-output.txt | while IFS= read -r line; do
-                            if [[ \$line =~ "passed" ]] && ([[ \$line =~ "Given" ]] || [[ \$line =~ "When" ]] || [[ \$line =~ "Then" ]] || [[ \$line =~ "And" ]]); then
-                                echo "💚 \$line" >> execution.log
-                            elif [[ \$line =~ "failed" ]] && ([[ \$line =~ "Given" ]] || [[ \$line =~ "When" ]] || [[ \$line =~ "Then" ]] || [[ \$line =~ "And" ]]); then
-                                echo "❌ \$line" >> execution.log
-                            elif [[ \$line =~ "skipped" ]] && ([[ \$line =~ "Given" ]] || [[ \$line =~ "When" ]] || [[ \$line =~ "Then" ]] || [[ \$line =~ "And" ]]); then
-                                echo "⏭️ \$line" >> execution.log
-                            elif [[ \$line =~ "pending" ]] && ([[ \$line =~ "Given" ]] || [[ \$line =~ "When" ]] || [[ \$line =~ "Then" ]] || [[ \$line =~ "And" ]]); then
-                                echo "⏳ \$line" >> execution.log
-                            elif [[ \$line =~ "expectedUrl" ]] || [[ \$line =~ "actualUrl" ]]; then
-                                echo "🔍 \$line" >> execution.log
-                            elif [[ \$line =~ "BUILD SUCCESS" ]] || [[ \$line =~ "BUILD FAILURE" ]]; then
-                                echo "\$line" >> execution.log
-                            elif [[ \$line =~ "Tests run:" ]]; then
-                                echo "\$line" >> execution.log
-                            fi
-                        done
-                    """
+                        # Sadece önemli satırları filtrele ve formatla
+                        awk '
+                            # Cucumber adımlarını kontrol et ve formatla
+                            /^[[:space:]]*(Given|When|Then|And)/ {
+                                if ($0 ~ /passed/) {
+                                    print "💚 " $0
+                                } else if ($0 ~ /failed/) {
+                                    print "❌ " $0
+                                } else if ($0 ~ /skipped/) {
+                                    print "⏭️ " $0
+                                } else if ($0 ~ /pending/) {
+                                    print "⏳ " $0
+                                } else {
+                                    print "   " $0
+                                }
+                                next
+                            }
+
+                            # URL bilgilerini kontrol et
+                            /expectedUrl|actualUrl/ {
+                                print "🔍 " $0
+                                next
+                            }
+
+                            # Test sonuçlarını kontrol et
+                            /Tests run:/ && !/Running/ {
+                                print $0
+                                next
+                            }
+
+                            # Build sonucunu kontrol et
+                            /BUILD SUCCESS|BUILD FAILURE/ {
+                                print $0
+                                next
+                            }
+                        ' temp_output.txt > execution.log
+
+                        # Geçici dosyayı sil
+                        rm temp_output.txt
+                    '''
                 }
             }
         }
@@ -92,7 +113,7 @@ pipeline {
                 script {
                     sh """
                         export JAVA_HOME=/usr/local/opt/openjdk@17
-                        ${M2_HOME}/bin/mvn verify -DskipTests -B
+                        ${M2_HOME}/bin/mvn verify -DskipTests -B --no-transfer-progress
                     """
 
                     allure([
@@ -126,19 +147,16 @@ pipeline {
         success {
             script {
                 def testResults = fileExists('execution.log') ? readFile('execution.log').trim() : "No test results available"
+                echo """╔════════════════════════════════╗
+║     Test Execution Summary     ║
+╚════════════════════════════════╝
 
-                echo """╔══════════════════════════════════╗
-║       Test Execution Summary     ║
-╚══════════════════════════════════╝
-
-📊 Test Results:
 ${testResults}
 
 📝 Reports:
-- Cucumber Report: ${BUILD_URL}cucumber-html-reports/overview-features.html
-- Allure Report: ${BUILD_URL}allure/
-
-✅ Tests Completed Successfully!"""
+• Cucumber: ${BUILD_URL}cucumber-html-reports/overview-features.html
+• Allure: ${BUILD_URL}allure/
+"""
             }
             cleanWs notFailBuild: true
         }
@@ -146,15 +164,14 @@ ${testResults}
         failure {
             script {
                 def testResults = fileExists('execution.log') ? readFile('execution.log').trim() : "No test results available"
+                echo """╔════════════════════════════════╗
+║     Test Execution Failed      ║
+╚════════════════════════════════╝
 
-                echo """╔══════════════════════════════════╗
-║       Test Execution Failed      ║
-╚══════════════════════════════════╝
-
-📊 Test Results:
 ${testResults}
 
-❌ FAILED: Check the logs for details"""
+❌ Build Failed
+"""
             }
             cleanWs notFailBuild: true
         }
