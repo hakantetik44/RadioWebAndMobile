@@ -14,7 +14,7 @@ import java.util.List;
 
 public class TestReportManager {
     private static TestReportManager instance; // Singleton instance
-    private List<TestInfo> listeInfosTest; // List to hold test info
+    private final List<TestInfo> listeInfosTest; // List to hold test info
     private static final String REPERTOIRE_RAPPORT = "target/rapports-tests"; // Directory for reports
 
     // Private constructor for singleton pattern
@@ -52,8 +52,7 @@ public class TestReportManager {
 
     // Method to generate the test report
     public void genererRapport(String nomTest) {
-        String horodatage = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss")
-                .format(java.time.LocalDateTime.now());
+        String horodatage = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss").format(java.time.LocalDateTime.now());
         String nomFichier = String.format("%s/%s_%s.xlsx", REPERTOIRE_RAPPORT, nomTest, horodatage);
 
         try (Workbook classeur = new XSSFWorkbook()) {
@@ -100,7 +99,7 @@ public class TestReportManager {
                 ligne.createCell(8).setCellValue(infos.getHeureExecution().format(dtf));
 
                 // Style red for failed tests
-                if ("FAILED".equals(infos.getStatut())) {
+                if ("FAILED".equalsIgnoreCase(infos.getStatut())) {
                     CellStyle styleEchec = classeur.createCellStyle();
                     styleEchec.setFillForegroundColor(IndexedColors.ROSE.getIndex());
                     styleEchec.setFillPattern(FillPatternType.SOLID_FOREGROUND);
