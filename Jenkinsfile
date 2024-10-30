@@ -16,53 +16,56 @@ pipeline {
         TIMESTAMP = new Date().format('yyyy-MM-dd_HH-mm-ss')
         CUCUMBER_REPORTS = 'target/cucumber-reports'
         ALLURE_RESULTS = 'target/allure-results'
+        PDF_REPORT = "Test_Report_${TIMESTAMP}.pdf"
     }
 
     stages {
         stage('Initialize') {
             steps {
                 script {
-                    echo """
-                        ╔══════════════════════════════════╗
-                        ║      Test Automation Start       ║
-                        ╚══════════════════════════════════╝
-                    """
+                    echo "Initializing Test Environment"
                 }
                 cleanWs()
                 checkout scm
 
                 sh '''
-                    export JAVA_HOME=/usr/local/opt/openjdk@17
-                    echo "JAVA_HOME = ${JAVA_HOME}"
-                    echo "M2_HOME = ${M2_HOME}"
+                    echo "Checking JAVA_HOME and Maven"
+                    if [ -z "$JAVA_HOME" ]; then
+                        echo "JAVA_HOME is not set!"
+                        exit 1
+                    fi
                     java -version
-                    ${M2_HOME}/bin/mvn -version
+                    mvn -version || { echo "Maven is not available!"; exit 1; }
                 '''
             }
         }
 
         stage('Build & Dependencies') {
             steps {
-                sh """
-                    export JAVA_HOME=/usr/local/opt/openjdk@17
-                    ${M2_HOME}/bin/mvn clean install -DskipTests
-                """
+                sh "${M2_HOME}/bin/mvn clean install -DskipTests"
             }
         }
 
         stage('Run Tests') {
             steps {
                 script {
-                    echo "🚀 Running Tests..."
-                    sh """
-                        export JAVA_HOME=/usr/local/opt/openjdk@17
-                        ${M2_HOME}/bin/mvn test \
-                        -Dtest=runner.TestRunner \
-                        -Dcucumber.plugin="pretty,json:target/cucumber.json,io.qameta.allure.cucumber7jvm.AllureCucumber7Jvm" \
-                        -Dwebdriver.chrome.headless=true \
-                        -Dwebdriver.chrome.args="--headless,--disable-gpu,--window-size=1920,1080" \
-                        | tee execution.log
-                    """
+                    try {
+                        echo "Running Tests..."
+                        withEnv(["JAVA_HOME=${JAVA_HOME}"]) {
+                            sh """
+                                ${M2_HOME}/bin/mvn test \
+                                -Dtest=runner.TestRunner \
+                                -Dcucumber.plugin="pretty,json:target/cucumber.json,io.qameta.allure.cucumber7jvm.AllureCucumber7Jvm" \
+                                -Dwebdriver.chrome.headless=true \
+                                -Dwebdriver.chrome.args="--headless,--disable-gpu,--window-size=1920,1080" \
+                                | tee execution.log
+                            """
+                        }
+                    } catch (Exception e) {
+                        currentBuild.result = 'FAILURE'
+                        echo "An error occurred: ${e.message}"
+                        throw e
+                    }
                 }
             }
         }
@@ -71,28 +74,31 @@ pipeline {
             steps {
                 script {
                     sh """
-                        export JAVA_HOME=/usr/local/opt/openjdk@17
                         ${M2_HOME}/bin/mvn verify -DskipTests
                     """
-
-                    // Allure raporu oluştur
                     allure([
                         includeProperties: false,
                         jdk: '',
                         properties: [],
                         reportBuildPolicy: 'ALWAYS',
-                        results: [[path: 'target/allure-results']]
+                        results: [[path: ALLURE_RESULTS]]
                     ])
+
+                    echo "Generating PDF Report..."
+                    sh """
+                        wkhtmltopdf ${BUILD_URL}cucumber-html-reports/overview-features.html ${PDF_REPORT}
+                    """
                 }
             }
             post {
                 always {
                     archiveArtifacts artifacts: """
-                        target/cucumber-reports/**/*,
+                        ${CUCUMBER_REPORTS}/**/*,
                         target/cucumber.json,
-                        target/allure-results/**/*,
+                        ${ALLURE_RESULTS}/**/*,
                         target/screenshots/**/*,
-                        execution.log
+                        execution.log,
+                        ${PDF_REPORT}
                     """, allowEmptyArchive: true
 
                     cucumber buildStatus: 'UNSTABLE',
@@ -104,7 +110,7 @@ pipeline {
     }
 
     post {
-        success {
+        always {
             script {
                 def testResults = ""
                 if (fileExists('execution.log')) {
@@ -112,31 +118,16 @@ pipeline {
                 }
 
                 echo """
-                    ╔══════════════════════════════════╗
-                    ║       Test Execution Summary     ║
-                    ╚══════════════════════════════════╝
-
-                    📊 Test Results:
+                    Test Execution Summary:
                     ${testResults}
 
-                    📝 Reports:
+                    Reports:
                     - Cucumber Report: ${BUILD_URL}cucumber-html-reports/overview-features.html
                     - Allure Report: ${BUILD_URL}allure/
+                    - PDF Report: ${BUILD_URL}${PDF_REPORT}
 
-                    ✅ SUCCESS
-                """
+
             }
-        }
-        failure {
-            echo """
-                ╔══════════════════════════════════╗
-                ║       Test Execution Failed      ║
-                ╚══════════════════════════════════╝
-
-                ❌ FAILED: Check the logs for details
-            """
-        }
-        always {
             cleanWs()
         }
     }
