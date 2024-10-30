@@ -11,7 +11,10 @@ import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
-import utils.*;
+import utils.ConfigReader;
+import utils.Driver;
+import utils.OS;
+import utils.TestManager;
 
 import org.openqa.selenium.By;
 
@@ -22,12 +25,13 @@ public class Hooks {
     public static final String NOM_APK = "radio-france.apk";
     public static final String URL_WEB = "https://www.radiofrance.fr/franceculture";
     protected WebDriverWait attente;
-    private TestInfo infosTest;
+    private TestManager infosTest;
+    private TestManager rapportTest;
 
     @Before
     public void avantTout(Scenario scenario) throws MalformedURLException {
         // Initialiser les informations pour le rapport de test
-        infosTest = new TestInfo();
+        infosTest = new TestManager();
         infosTest.setNomScenario(scenario.getName());
         infosTest.setNomEtape("Début du Test");
         infosTest.setStatut("DÉMARRÉ");
@@ -35,8 +39,6 @@ public class Hooks {
         // Définir la plateforme
         OS.OS = ConfigReader.getProperty("platformName");
         infosTest.setPlateforme(OS.OS);
-
-        TestReportManager.getInstance().ajouterInfosTest(infosTest);
 
         // Initialisations spécifiques à la plateforme
         if (OS.isWeb()) {
@@ -46,9 +48,15 @@ public class Hooks {
         }
     }
 
+
     @Given("Je lance l'application")
     public void lanceApp() throws MalformedURLException {
-        TestInfo infosLancementApp = new TestInfo();
+
+        TestManager infosLancementApp = new TestManager();
+
+        infosLancementApp.setNomScenario("Nom du scénario de test");
+        infosLancementApp.setNomEtape("Début du Test");
+        infosLancementApp.setStatut("DÉMARRÉ");
         infosLancementApp.setNomEtape("Lancement de l'Application");
 
         try {
@@ -72,12 +80,13 @@ public class Hooks {
             infosLancementApp.setMessageErreur("Erreur de lancement de l'application : " + e.getMessage());
             throw e;
         } finally {
-            TestReportManager.getInstance().ajouterInfosTest(infosLancementApp);
+            // Enregistrer les informations de lancement
+            infosTest.ajouterInfosTest(infosLancementApp);
         }
     }
 
     private void gererPopupsEtCookies() {
-        TestInfo infosPopup = new TestInfo();
+        TestManager infosPopup = new TestManager();
         infosPopup.setNomEtape("Gestion des Popups et Cookies");
 
         try {
@@ -116,14 +125,13 @@ public class Hooks {
             infosPopup.setStatut("AVERTISSEMENT");
             infosPopup.setMessageErreur("Avertissement lors du traitement des popups : " + e.getMessage());
         } finally {
-            TestReportManager.getInstance().ajouterInfosTest(infosPopup);
+            // Enregistrer les informations de popup
+            infosTest.ajouterInfosTest(infosPopup);
         }
     }
 
     @After
     public void terminer(Scenario scenario) {
-        infosTest = new TestInfo();
-        infosTest.setNomScenario(scenario.getName());
         infosTest.setNomEtape("Fin du Test");
 
         try {
@@ -152,8 +160,8 @@ public class Hooks {
             infosTest.setStatut("ERREUR");
             infosTest.setMessageErreur("Erreur lors de la fin du test : " + e.getMessage());
         } finally {
-            TestReportManager.getInstance().ajouterInfosTest(infosTest);
-            TestReportManager.getInstance().genererRapport("RadioFrance");
+            // Générer le rapport de test
+            infosTest.genererRapport("RadioFrance");
             quitterDriver();
         }
     }
