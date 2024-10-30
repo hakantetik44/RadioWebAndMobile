@@ -39,23 +39,38 @@ pipeline {
                     cleanWs()
                     checkout scm
 
-                    def configProps = sh(
-                        script: 'cat src/test/resources/configuration.properties',
-                        returnStdout: true
-                    ).trim().split('\n').collectEntries { line ->
-                        def parts = line.split('=')
-                        [(parts[0]): parts[1]]
+                    // Varsayılan değerler
+                    env.PLATFORM_NAME = params.PLATFORM_NAME ?: 'Web'
+                    env.BROWSER = params.PLATFORM_NAME == 'Web' ? (params.BROWSER ?: 'chrome') : ''
+
+                    // Properties dosyasını kontrol et ve oku
+                    if (fileExists('src/test/resources/configuration.properties')) {
+                        def configContent = sh(
+                            script: 'cat src/test/resources/configuration.properties',
+                            returnStdout: true
+                        ).trim()
+
+                        def props = configContent.split('\n').collectEntries { line ->
+                            def parts = line.split('=')
+                            if (parts.size() == 2) {
+                                [(parts[0].trim()): parts[1].trim()]
+                            } else {
+                                [:]
+                            }
+                        }
+
+                        if (props.platformName) env.PLATFORM_NAME = props.platformName
+                        if (props.browser && env.PLATFORM_NAME == 'Web') env.BROWSER = props.browser
                     }
 
-                    env.PLATFORM_NAME = params.PLATFORM_NAME ?: configProps.platformName ?: 'Web'
-                    env.BROWSER = params.PLATFORM_NAME == 'Web' ? (params.BROWSER ?: configProps.browser ?: 'chrome') : ''
-
-                    echo """Configuration:
+                    echo """Configuration actuelle:
                     • Plateforme: ${env.PLATFORM_NAME}
                     • Navigateur: ${env.PLATFORM_NAME == 'Web' ? env.BROWSER : 'N/A'}"""
 
                     sh """
                         mkdir -p ${EXCEL_REPORTS} ${ALLURE_RESULTS} target/screenshots
+
+                        echo "=== Vérification de l'environnement ==="
                         export JAVA_HOME=${JAVA_HOME}
                         java -version
                         ${M2_HOME}/bin/mvn -version
