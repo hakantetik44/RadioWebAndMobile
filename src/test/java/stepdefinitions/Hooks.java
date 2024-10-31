@@ -1,3 +1,4 @@
+
 package stepdefinitions;
 
 import io.appium.java_client.android.AndroidDriver;
@@ -17,7 +18,6 @@ import utils.OS;
 import utils.TestManager;
 import org.openqa.selenium.By;
 
-import java.net.MalformedURLException;
 import java.time.Duration;
 
 public class Hooks {
@@ -34,7 +34,7 @@ public class Hooks {
             OS.OS = ConfigReader.getProperty("platformName");
 
             // Initialiser les informations pour le rapport de test
-            infosTest = new TestManager();
+            infosTest = TestManager.getInstance();
             infosTest.setNomScenario(scenario.getName());
             infosTest.setNomEtape("Début du Test");
             infosTest.setPlateforme(OS.OS);
@@ -55,8 +55,14 @@ public class Hooks {
 
             TestManager.getInstance().ajouterInfosTest(infosTest);
 
+            // Test önerilerini al ve göster
+            if (!infosTest.getTestSuggestions().isEmpty()) {
+                System.out.println("\n🤖 Suggestions pour ce test:");
+                infosTest.getTestSuggestions().forEach(s -> System.out.println("• " + s));
+            }
+
         } catch (Exception e) {
-            infosTest.setStatut("ÉCHOUÉ");
+            infosTest.setStatut("ECHEC");
             infosTest.setMessageErreur("Erreur d'initialisation: " + e.getMessage());
             TestManager.getInstance().ajouterInfosTest(infosTest);
             throw new RuntimeException(e);
@@ -65,7 +71,7 @@ public class Hooks {
 
     @Given("Je lance l'application")
     public void lanceApp() {
-        infosTest = new TestManager();
+        infosTest = TestManager.getInstance();
         infosTest.setNomEtape("Lancement de l'Application");
         System.out.println("Lancement de l'application web : " + URL_WEB);
 
@@ -76,7 +82,7 @@ public class Hooks {
                     driver.get(URL_WEB);
                     this.attente = new WebDriverWait(driver, Duration.ofSeconds(10));
                     gererPopupsEtCookies();
-                    infosTest.setStatut("RÉUSSI");
+                    infosTest.setStatut("REUSSI");
                     infosTest.setResultatReel("L'application web a été lancée avec succès");
                     infosTest.setUrl(URL_WEB);
                 }
@@ -84,7 +90,7 @@ public class Hooks {
                 throw new RuntimeException("Driver non initialisé");
             }
         } catch (Exception e) {
-            infosTest.setStatut("ÉCHOUÉ");
+            infosTest.setStatut("ECHEC");
             infosTest.setMessageErreur("Erreur de lancement: " + e.getMessage());
             throw e;
         } finally {
@@ -93,7 +99,7 @@ public class Hooks {
     }
 
     private void gererPopupsEtCookies() {
-        TestManager infosPopup = new TestManager();
+        TestManager infosPopup = TestManager.getInstance();
         infosPopup.setNomEtape("Gestion des Popups et Cookies");
         StringBuilder resultats = new StringBuilder();
 
@@ -113,10 +119,10 @@ public class Hooks {
                 }
             }
 
-            infosPopup.setStatut("RÉUSSI");
+            infosPopup.setStatut("REUSSI");
             infosPopup.setResultatReel(resultats.toString());
         } catch (Exception e) {
-            infosPopup.setStatut("AVERTISSEMENT");
+            infosPopup.setStatut("ECHEC");
             infosPopup.setMessageErreur("Gestion des popups: " + e.getMessage());
         } finally {
             TestManager.getInstance().ajouterInfosTest(infosPopup);
@@ -126,7 +132,7 @@ public class Hooks {
     @After
     public void terminer(Scenario scenario) {
         try {
-            infosTest = new TestManager();
+            infosTest = TestManager.getInstance();
             infosTest.setNomEtape("Fin du Test");
             infosTest.setNomScenario(scenario.getName());
 
@@ -135,24 +141,34 @@ public class Hooks {
                 infosTest.setUrl(driver.getCurrentUrl());
 
                 if (scenario.isFailed()) {
-                    infosTest.setStatut("ÉCHOUÉ");
+                    infosTest.setStatut("ECHEC");
                     if (driver instanceof TakesScreenshot) {
                         byte[] screenshot = ((TakesScreenshot) driver).getScreenshotAs(OutputType.BYTES);
                         scenario.attach(screenshot, "image/png", "screenshot-erreur");
                         infosTest.setResultatReel("Test échoué - Capture d'écran ajoutée");
 
+                        // Hata analizini göster
+                        System.out.println("\n🔍 Analyse de l'échec:");
+                        System.out.println(infosTest.getMessageErreur());
                     }
                 } else {
-                    infosTest.setStatut("RÉUSSI");
+                    infosTest.setStatut("REUSSI");
                     infosTest.setResultatReel("Test terminé avec succès");
                 }
             }
 
         } catch (Exception e) {
-            infosTest.setStatut("ERREUR");
+            infosTest.setStatut("ECHEC");
             infosTest.setMessageErreur("Erreur finale: " + e.getMessage());
         } finally {
             TestManager.getInstance().ajouterInfosTest(infosTest);
+
+            // Test pattern analizi
+            System.out.println("\n📊 Résumé du test:");
+            System.out.println("• Scénario: " + scenario.getName());
+            System.out.println("• Statut: " + infosTest.getStatut());
+
+            // Rapor oluştur
             TestManager.getInstance().genererRapport("RadioFrance");
             quitterDriver();
         }

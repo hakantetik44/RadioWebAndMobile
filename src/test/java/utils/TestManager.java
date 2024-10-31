@@ -3,6 +3,7 @@ package utils;
 
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -12,8 +13,10 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 public class TestManager {
-    // Attributs privés pour le singleton et les données de test
+    // Singleton instance
     private static TestManager instance;
+
+    // Test bilgileri
     private String nomScenario;
     private String nomEtape;
     private String statut;
@@ -24,32 +27,61 @@ public class TestManager {
     private String messageErreur;
     private LocalDateTime dateExecution;
 
-    // Collections pour stocker les rapports et les analyses
-    private List<TestManager> rapportsTests;
-    private Map<String, String> analysisResults;
+    // Koleksiyonlar
+    private final List<TestManager> rapportsTests;
+    private final Map<String, String> analysisResults;
+    private final Map<String, Integer> stepPatterns;
+    private final List<String> testSuggestions;
 
-    // Constantes pour les chemins et la plateforme
+    // Sabitler
     private static final String EXCEL_REPORTS_DIR = "target/rapports-tests";
     private static final String PLATFORM = System.getProperty("platformName", "Web");
 
-    // Constructeur privé pour le singleton
-    public TestManager() {
+    // Yapay zeka analiz sabitleri
+    private static final Map<String, String> ERROR_PATTERNS = new HashMap<>();
+    private static final Map<String, List<String>> STEP_SUGGESTIONS = new HashMap<>();
+
+    static {
+        // Hata pattern'leri
+        ERROR_PATTERNS.put("element_not_found",
+                "• Vérifier si l'élément est présent dans la page\n" +
+                        "• Augmenter le temps d'attente\n" +
+                        "• Vérifier le sélecteur utilisé");
+
+        ERROR_PATTERNS.put("click_error",
+                "• Vérifier si l'élément est cliquable\n" +
+                        "• Attendre que l'élément soit interactif\n" +
+                        "• Vérifier s'il n'y a pas de popup qui bloque");
+
+        ERROR_PATTERNS.put("timeout",
+                "• Augmenter le timeout\n" +
+                        "• Vérifier la connexion réseau\n" +
+                        "• Vérifier la performance de la page");
+
+        // Step önerileri
+        STEP_SUGGESTIONS.put("page_accueil", Arrays.asList(
+                "Je clique sur le bouton \"Recherche\"",
+                "Je vérifie le menu principal",
+                "Je vérifie le logo Radio France"
+        ));
+
+        STEP_SUGGESTIONS.put("recherche", Arrays.asList(
+                "Je saisis un terme de recherche",
+                "Je vérifie les résultats",
+                "Je clique sur un résultat"
+        ));
+    }
+
+    private TestManager() {
         rapportsTests = new ArrayList<>();
         analysisResults = new HashMap<>();
+        stepPatterns = new HashMap<>();
+        testSuggestions = new ArrayList<>();
         dateExecution = LocalDateTime.now();
         createReportsDirectory();
         this.plateforme = PLATFORM;
     }
 
-    // Méthode pour créer le répertoire des rapports
-    private void createReportsDirectory() {
-        File directory = new File(EXCEL_REPORTS_DIR);
-        if (!directory.exists()) {
-            directory.mkdirs();
-        }
-    }
-
-    // Méthode singleton pour obtenir l'instance
     public static TestManager getInstance() {
         if (instance == null) {
             instance = new TestManager();
@@ -57,240 +89,305 @@ public class TestManager {
         return instance;
     }
 
-    // Méthodes Getter et Setter
-    public String getNomScenario() { return nomScenario; }
-    public void setNomScenario(String nomScenario) { this.nomScenario = nomScenario; }
+    private void createReportsDirectory() {
+        File directory = new File(EXCEL_REPORTS_DIR);
+        if (!directory.exists()) {
+            directory.mkdirs();
+        }
+    }
 
-    public String getNomEtape() { return nomEtape; }
-    public void setNomEtape(String nomEtape) { this.nomEtape = nomEtape; }
+    // Getter ve Setter metodları
+    public String getNomScenario() {
+        return nomScenario;
+    }
 
-    public String getStatut() { return statut; }
-    public void setStatut(String statut) { this.statut = statut; }
+    public void setNomScenario(String nomScenario) {
+        this.nomScenario = nomScenario;
+    }
 
-    public String getPlateforme() { return plateforme; }
-    public void setPlateforme(String plateforme) { this.plateforme = plateforme; }
+    public String getNomEtape() {
+        return nomEtape;
+    }
 
-    public String getResultatAttendu() { return resultatAttendu; }
-    public void setResultatAttendu(String resultatAttendu) { this.resultatAttendu = resultatAttendu; }
+    public void setNomEtape(String nomEtape) {
+        this.nomEtape = nomEtape;
+        updateStepPattern(nomEtape);
+    }
 
-    public String getResultatReel() { return resultatReel; }
-    public void setResultatReel(String resultatReel) { this.resultatReel = resultatReel; }
+    public String getStatut() {
+        return statut;
+    }
 
-    public String getUrl() { return url; }
-    public void setUrl(String url) { this.url = url; }
+    public void setStatut(String statut) {
+        this.statut = statut;
+        if ("ECHEC".equalsIgnoreCase(statut)) {
+            analyzeFailure();
+        }
+    }
 
-    public String getMessageErreur() { return messageErreur; }
-    public void setMessageErreur(String messageErreur) { this.messageErreur = messageErreur; }
+    public String getPlateforme() {
+        return plateforme;
+    }
 
-    // Méthode pour ajouter des informations de test
+    public void setPlateforme(String plateforme) {
+        this.plateforme = plateforme;
+    }
+
+    public String getResultatAttendu() {
+        return resultatAttendu;
+    }
+
+    public void setResultatAttendu(String resultatAttendu) {
+        this.resultatAttendu = resultatAttendu;
+    }
+
+    public String getResultatReel() {
+        return resultatReel;
+    }
+
+    public void setResultatReel(String resultatReel) {
+        this.resultatReel = resultatReel;
+    }
+
+    public String getUrl() {
+        return url;
+    }
+
+    public void setUrl(String url) {
+        this.url = url;
+    }
+
+    public String getMessageErreur() {
+        return messageErreur;
+    }
+
+    public void setMessageErreur(String messageErreur) {
+        this.messageErreur = messageErreur;
+        if (messageErreur != null) {
+            analyzeError(messageErreur);
+        }
+    }
+
+    // Test adımı ekleme ve analiz
     public void ajouterInfosTest(TestManager testInfo) {
+        if (testInfo == null) return;
+
         boolean isDuplicate = rapportsTests.stream()
                 .anyMatch(existing -> isSameStep(existing, testInfo));
 
         if (!isDuplicate) {
             testInfo.dateExecution = LocalDateTime.now();
-            testInfo.plateforme = PLATFORM;
             rapportsTests.add(testInfo);
+            updateAnalysis(testInfo);
+            suggestNextSteps(testInfo);
         }
     }
 
-    // Méthode pour vérifier les doublons
-    private boolean isSameStep(TestManager existing, TestManager newInfo) {
-        return Objects.equals(existing.getNomEtape(), newInfo.getNomEtape()) &&
-                Objects.equals(existing.getNomScenario(), newInfo.getNomScenario()) &&
-                Objects.equals(existing.getUrl(), newInfo.getUrl());
+    // Dinamik test analizi
+    private void updateAnalysis(TestManager testInfo) {
+        // Step pattern analizi
+        stepPatterns.merge(testInfo.getNomEtape(), 1, Integer::sum);
+
+        // Başarı oranı analizi
+        int totalTests = rapportsTests.size();
+        long successCount = rapportsTests.stream()
+                .filter(t -> "REUSSI".equalsIgnoreCase(t.getStatut()))
+                .count();
+
+        double successRate = (successCount * 100.0) / totalTests;
+
+        // Analiz sonuçlarını kaydet
+        analysisResults.put("success_rate", String.format("%.1f%%", successRate));
+        analysisResults.put("most_used_step", getMostUsedStep());
+        analysisResults.put("test_duration", calculateTestDuration());
     }
 
-    // Méthode d'analyse des résultats des tests
-    public String analyzeTestResults() {
-        int totalTests = rapportsTests.size();
-        if (totalTests == 0) return "Aucun résultat de test disponible.";
+    // Dinamik sonraki adım önerisi
+    private void suggestNextSteps(TestManager currentTest) {
+        String currentStep = currentTest.getNomEtape().toLowerCase();
+        List<String> suggestions = new ArrayList<>();
 
-        int passedTests = 0;
-        int failedTests = 0;
-        Map<String, Integer> stepFailures = new HashMap<>();
-        Set<String> uniqueScenarios = new HashSet<>();
+        // Başarılı test akışlarından öğren
+        Map<String, List<String>> successfulFlows = analyzeSuccessfulFlows();
+
+        if (successfulFlows.containsKey(currentStep)) {
+            suggestions.addAll(successfulFlows.get(currentStep));
+        }
+
+        // Önceden tanımlanmış öneriler
+        if (STEP_SUGGESTIONS.containsKey(getStepType(currentStep))) {
+            suggestions.addAll(STEP_SUGGESTIONS.get(getStepType(currentStep)));
+        }
+
+        // Test geçmişinden öneriler
+        List<String> historicalNextSteps = findHistoricalNextSteps(currentStep);
+        suggestions.addAll(historicalNextSteps);
+
+        // Önerileri kaydet
+        testSuggestions.clear();
+        testSuggestions.addAll(suggestions.stream()
+                .distinct()
+                .limit(3)
+                .collect(Collectors.toList()));
+    }
+
+    // Test akışı analizi
+    private Map<String, List<String>> analyzeSuccessfulFlows() {
+        Map<String, List<String>> flows = new HashMap<>();
+        List<TestManager> successfulTests = rapportsTests.stream()
+                .filter(t -> "REUSSI".equalsIgnoreCase(t.getStatut()))
+                .collect(Collectors.toList());
+
+        for (int i = 0; i < successfulTests.size() - 1; i++) {
+            String currentStep = successfulTests.get(i).getNomEtape().toLowerCase();
+            String nextStep = successfulTests.get(i + 1).getNomEtape();
+
+            flows.computeIfAbsent(currentStep, k -> new ArrayList<>()).add(nextStep);
+        }
+
+        return flows;
+    }
+
+    // Geçmiş test adımlarından öneriler
+    private List<String> findHistoricalNextSteps(String currentStep) {
+        List<String> nextSteps = new ArrayList<>();
+        boolean foundCurrent = false;
 
         for (TestManager test : rapportsTests) {
-            uniqueScenarios.add(test.getNomScenario());
-
-            if ("REUSSI".equalsIgnoreCase(test.getStatut())) {
-                passedTests++;
-            } else {
-                failedTests++;
-                stepFailures.merge(test.getNomEtape(), 1, Integer::sum);
+            if (foundCurrent) {
+                nextSteps.add(test.getNomEtape());
+                foundCurrent = false;
+            }
+            if (test.getNomEtape().toLowerCase().equals(currentStep)) {
+                foundCurrent = true;
             }
         }
 
-        double successRate = (passedTests * 100.0) / totalTests;
+        return nextSteps;
+    }
+
+    // Hata analizi ve öneriler
+    private void analyzeFailure() {
+        String stepType = getStepType(nomEtape);
+        String errorType = getErrorType(messageErreur);
 
         StringBuilder analysis = new StringBuilder();
-        analysis.append(String.format("📊 Analyse des Tests:\n"));
-        analysis.append(String.format("• Total des Étapes: %d\n", totalTests));
-        analysis.append(String.format("• Réussis: %d (%.1f%%)\n", passedTests, successRate));
-        analysis.append(String.format("• Échoués: %d (%.1f%%)\n", failedTests, 100 - successRate));
-        analysis.append(String.format("• Nombre de Scénarios: %d\n", uniqueScenarios.size()));
+        analysis.append("\n🔍 Analyse d'Échec:\n");
+        analysis.append("Type d'étape: ").append(stepType).append("\n");
+        analysis.append("Type d'erreur: ").append(errorType).append("\n");
 
-        if (!stepFailures.isEmpty()) {
-            analysis.append("\n🔍 Étapes les Plus Problématiques:\n");
-            stepFailures.entrySet().stream()
-                    .sorted((e1, e2) -> e2.getValue().compareTo(e1.getValue()))
-                    .limit(3)
-                    .forEach(e -> analysis.append(String.format("• %s: %d fois\n", e.getKey(), e.getValue())));
+        // Hata önerileri
+        if (ERROR_PATTERNS.containsKey(errorType)) {
+            analysis.append("\nSuggestions:\n").append(ERROR_PATTERNS.get(errorType));
         }
 
-        // Analyse de la durée des tests
-        if (totalTests > 1) {
-            long totalDuration = 0;
-            TestManager firstTest = rapportsTests.get(0);
-            TestManager lastTest = rapportsTests.get(rapportsTests.size() - 1);
-            totalDuration = java.time.Duration.between(firstTest.dateExecution, lastTest.dateExecution).getSeconds();
-
-            analysis.append(String.format("\n⏱️ Performance:\n"));
-            analysis.append(String.format("• Durée Totale: %d secondes\n", totalDuration));
-            analysis.append(String.format("• Durée Moyenne par Étape: %.1f secondes\n", totalDuration / (double) totalTests));
+        // Başarılı örneklerden öğren
+        List<TestManager> similarSuccessfulTests = findSimilarSuccessfulTests(stepType);
+        if (!similarSuccessfulTests.isEmpty()) {
+            analysis.append("\nExemples réussis:\n");
+            similarSuccessfulTests.forEach(t ->
+                    analysis.append("• ").append(t.getNomEtape())
+                            .append(" (").append(t.getResultatReel()).append(")\n")
+            );
         }
 
-        // Suggestions d'amélioration
-        analysis.append("\n💡 Recommandations:\n");
-        if (successRate < 100) {
-            analysis.append("• Examiner les tests échoués\n");
-            if (!stepFailures.isEmpty()) {
-                analysis.append("• Optimiser les étapes fréquemment échouées\n");
-            }
-        }
-        if (totalTests < 5) {
-            analysis.append("• Augmenter la couverture des tests\n");
-        }
-
-        analysisResults.put("test_analysis", analysis.toString());
-        return analysis.toString();
+        analysisResults.put("failure_analysis", analysis.toString());
     }
 
-    // Méthode de suggestion d'améliorations
-    public String suggestTestImprovements() {
-        StringBuilder suggestions = new StringBuilder();
-        suggestions.append("🔄 Suggestions d'Amélioration:\n\n");
-
-        Set<String> uniqueScenarios = rapportsTests.stream()
-                .map(TestManager::getNomScenario)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
-
-        if (uniqueScenarios.size() < 3) {
-            suggestions.append("1. Diversité des Tests:\n");
-            suggestions.append("   • Ajouter plus de scénarios de test\n");
-            suggestions.append("   • Tester différents parcours utilisateur\n\n");
-        }
-
-        // Analyse des erreurs
-        Map<String, Long> errorPatterns = rapportsTests.stream()
-                .filter(t -> t.getMessageErreur() != null && !t.getMessageErreur().isEmpty())
-                .collect(Collectors.groupingBy(
-                        TestManager::getMessageErreur,
-                        Collectors.counting()
-                ));
-
-        if (!errorPatterns.isEmpty()) {
-            suggestions.append("2. Analyse des Erreurs:\n");
-            errorPatterns.forEach((error, count) -> {
-                suggestions.append(String.format("   • L'erreur '%s' s'est produite %d fois\n",
-                        error.substring(0, Math.min(50, error.length())), count));
-            });
-            suggestions.append("\n");
-        }
-
-        // Analyse par plateforme
-        Map<String, Long> platformStats = rapportsTests.stream()
-                .collect(Collectors.groupingBy(
-                        TestManager::getPlateforme,
-                        Collectors.counting()
-                ));
-
-        suggestions.append("3. Distribution par Plateforme:\n");
-        platformStats.forEach((platform, count) -> {
-            suggestions.append(String.format("   • %s: %d tests\n", platform, count));
-        });
-
-        analysisResults.put("improvement_suggestions", suggestions.toString());
-        return suggestions.toString();
+    // Benzer başarılı testleri bul
+    private List<TestManager> findSimilarSuccessfulTests(String stepType) {
+        return rapportsTests.stream()
+                .filter(t -> "REUSSI".equalsIgnoreCase(t.getStatut()))
+                .filter(t -> getStepType(t.getNomEtape()).equals(stepType))
+                .limit(3)
+                .collect(Collectors.toList());
     }
 
-    // Méthode de génération du rapport Excel
+    // Step tipini belirle
+    private String getStepType(String step) {
+        step = step.toLowerCase();
+        if (step.contains("page") && step.contains("accueil")) return "page_accueil";
+        if (step.contains("recherche")) return "recherche";
+        if (step.contains("clic")) return "click";
+        if (step.contains("verif")) return "verification";
+        return "other";
+    }
+
+    // Hata tipini belirle
+    private String getErrorType(String error) {
+        if (error == null) return "unknown";
+        error = error.toLowerCase();
+        if (error.contains("element") && error.contains("not found")) return "element_not_found";
+        if (error.contains("click")) return "click_error";
+        if (error.contains("timeout")) return "timeout";
+        return "unknown";
+    }
+
+    // Test süresini hesapla
+    private String calculateTestDuration() {
+        if (rapportsTests.isEmpty()) return "0s";
+
+        TestManager firstTest = rapportsTests.get(0);
+        TestManager lastTest = rapportsTests.get(rapportsTests.size() - 1);
+
+        long seconds = java.time.Duration.between(
+                firstTest.dateExecution,
+                lastTest.dateExecution
+        ).getSeconds();
+
+        return String.format("%ds", seconds);
+    }
+
+    // En çok kullanılan adımı bul
+    private String getMostUsedStep() {
+        return stepPatterns.entrySet().stream()
+                .max(Map.Entry.comparingByValue())
+                .map(Map.Entry::getKey)
+                .orElse("Aucun");
+    }
+
+    // Önerileri al
+    public List<String> getTestSuggestions() {
+        return new ArrayList<>(testSuggestions);
+    }
+
+    // Excel raporu oluştur
     public void genererRapport(String nomRapport) {
-        analyzeTestResults();
-        suggestTestImprovements();
-
         String timeStamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss"));
         String fileName = String.format("%s/%s_%s.xlsx", EXCEL_REPORTS_DIR, nomRapport, timeStamp);
 
         try (Workbook workbook = new XSSFWorkbook()) {
-            Sheet testSheet = workbook.createSheet("Résultats des Tests");
-            createTestResultsSheet(testSheet, workbook);
+            // Test sonuçları sayfası
+            createTestResultsSheet(workbook.createSheet("Résultats des Tests"));
 
-            Sheet analysisSheet = workbook.createSheet("Analyse");
-            createAnalysisSheet(analysisSheet);
+            // Analiz sayfası
+            createAnalysisSheet(workbook.createSheet("Analyse"));
 
-            saveWorkbook(workbook, fileName);
+            // Öneriler sayfası
+            createSuggestionsSheet(workbook.createSheet("Suggestions"));
 
+            // Kaydet
+            try (FileOutputStream outputStream = new FileOutputStream(fileName)) {
+                workbook.write(outputStream);
+                System.out.println("Rapport généré: " + fileName);
+            }
         } catch (IOException e) {
-            System.err.println("Erreur lors de la génération du rapport Excel: " + e.getMessage());
-            e.printStackTrace();
+            System.err.println("Erreur rapport: " + e.getMessage());
         }
     }
 
-    // Méthode de création de la feuille d'analyse
-    private void createAnalysisSheet(Sheet sheet) {
-        int rowNum = 0;
+    // Excel sayfalarını oluşturma metodları
+    private void createTestResultsSheet(Sheet sheet) {
+        CellStyle headerStyle = createHeaderStyle(sheet.getWorkbook());
+        CellStyle successStyle = createSuccessStyle(sheet.getWorkbook());
+        CellStyle failureStyle = createFailureStyle(sheet.getWorkbook());
 
-        CellStyle headerStyle = sheet.getWorkbook().createCellStyle();
-        Font headerFont = sheet.getWorkbook().createFont();
-        headerFont.setBold(true);
-        headerStyle.setFont(headerFont);
-
-        // Section Analyse
-        Row analysisHeaderRow = sheet.createRow(rowNum++);
-        Cell headerCell = analysisHeaderRow.createCell(0);
-        headerCell.setCellValue("Analyse des Tests");
-        headerCell.setCellStyle(headerStyle);
-
-        String analysis = analysisResults.get("test_analysis");
-        String[] analysisLines = analysis.split("\n");
-        for (String line : analysisLines) {
-            Row row = sheet.createRow(rowNum++);
-            row.createCell(0).setCellValue(line);
-        }
-
-        rowNum++; // Ligne vide
-
-        // Section Suggestions
-        Row suggestionsHeaderRow = sheet.createRow(rowNum++);
-        Cell suggestionsHeaderCell = suggestionsHeaderRow.createCell(0);
-        suggestionsHeaderCell.setCellValue("Suggestions d'Amélioration");
-        suggestionsHeaderCell.setCellStyle(headerStyle);
-
-        String suggestions = analysisResults.get("improvement_suggestions");
-        String[] suggestionLines = suggestions.split("\n");
-        for (String line : suggestionLines) {
-            Row row = sheet.createRow(rowNum++);
-            row.createCell(0).setCellValue(line);
-        }
-
-        sheet.setColumnWidth(0, 15000);
-    }
-
-    // Méthode de création de la feuille des résultats de tests
-    private void createTestResultsSheet(Sheet sheet, Workbook workbook) {
-        CellStyle headerStyle = createHeaderStyle(workbook);
-        CellStyle successStyle = createSuccessStyle(workbook);
-        CellStyle failureStyle = createFailureStyle(workbook);
-
-        // En-têtes
+        // Başlık satırı
         Row headerRow = sheet.createRow(0);
         String[] columns = {
                 "Scénario", "Étape", "Statut", "Plateforme",
                 "Résultat Attendu", "Résultat Réel", "URL",
-                "Message d'Erreur", "Date d'Exécution"
+                "Message d'Erreur", "Date d'Exécution", "Durée"
         };
 
         for (int i = 0; i < columns.length; i++) {
@@ -300,7 +397,7 @@ public class TestManager {
             sheet.setColumnWidth(i, 6000);
         }
 
-        // Données
+        // Test verileri
         int rowNum = 1;
         for (TestManager info : rapportsTests) {
             Row row = sheet.createRow(rowNum++);
@@ -317,7 +414,7 @@ public class TestManager {
                 statutCell.setCellStyle(failureStyle);
             }
 
-            row.createCell(3).setCellValue(info.getPlateforme() != null ? info.getPlateforme() : PLATFORM);
+            row.createCell(3).setCellValue(info.getPlateforme() != null ? info.getPlateforme() : "");
             row.createCell(4).setCellValue(info.getResultatAttendu() != null ? info.getResultatAttendu() : "");
             row.createCell(5).setCellValue(info.getResultatReel() != null ? info.getResultatReel() : "");
             row.createCell(6).setCellValue(info.getUrl() != null ? info.getUrl() : "");
@@ -328,7 +425,87 @@ public class TestManager {
         }
     }
 
-    // Méthodes de style pour Excel
+    private void createAnalysisSheet(Sheet sheet) {
+        CellStyle headerStyle = createHeaderStyle(sheet.getWorkbook());
+        int rowNum = 0;
+
+        // Genel İstatistikler
+        Row titleRow = sheet.createRow(rowNum++);
+        Cell titleCell = titleCell = titleRow.createCell(0);
+        titleCell.setCellValue("Statistiques Générales");
+        titleCell.setCellStyle(headerStyle);
+
+        rowNum = addAnalysisSection(sheet, rowNum, "Taux de Réussite", analysisResults.get("success_rate"));
+        rowNum = addAnalysisSection(sheet, rowNum, "Étape la Plus Utilisée", analysisResults.get("most_used_step"));
+        rowNum = addAnalysisSection(sheet, rowNum, "Durée Totale", analysisResults.get("test_duration"));
+
+        rowNum++; // Boş satır
+
+        // Hata Analizi
+        if (analysisResults.containsKey("failure_analysis")) {
+            Row analysisTitle = sheet.createRow(rowNum++);
+            Cell analysisTitleCell = analysisTitle.createCell(0);
+            analysisTitleCell.setCellValue("Analyse des Échecs");
+            analysisTitleCell.setCellStyle(headerStyle);
+
+            String[] analysisLines = analysisResults.get("failure_analysis").split("\n");
+            for (String line : analysisLines) {
+                Row row = sheet.createRow(rowNum++);
+                row.createCell(0).setCellValue(line);
+            }
+        }
+
+        sheet.setColumnWidth(0, 15000);
+        sheet.setColumnWidth(1, 10000);
+    }
+
+    private void createSuggestionsSheet(Sheet sheet) {
+        CellStyle headerStyle = createHeaderStyle(sheet.getWorkbook());
+        int rowNum = 0;
+
+        // Başlık
+        Row titleRow = sheet.createRow(rowNum++);
+        Cell titleCell = titleRow.createCell(0);
+        titleCell.setCellValue("Suggestions d'Amélioration");
+        titleCell.setCellStyle(headerStyle);
+
+        rowNum++; // Boş satır
+
+        // Test önerileri
+        if (!testSuggestions.isEmpty()) {
+            Row suggestionsTitle = sheet.createRow(rowNum++);
+            suggestionsTitle.createCell(0).setCellValue("Prochaines Étapes Suggérées:");
+
+            for (String suggestion : testSuggestions) {
+                Row row = sheet.createRow(rowNum++);
+                row.createCell(0).setCellValue("• " + suggestion);
+            }
+        }
+
+        rowNum++; // Boş satır
+
+        // Pattern analizi
+        Row patternsTitle = sheet.createRow(rowNum++);
+        patternsTitle.createCell(0).setCellValue("Patterns de Test Identifiés:");
+
+        for (Map.Entry<String, Integer> pattern : stepPatterns.entrySet()) {
+            Row row = sheet.createRow(rowNum++);
+            row.createCell(0).setCellValue(pattern.getKey());
+            row.createCell(1).setCellValue(pattern.getValue() + " fois");
+        }
+
+        sheet.setColumnWidth(0, 15000);
+        sheet.setColumnWidth(1, 5000);
+    }
+
+    private int addAnalysisSection(Sheet sheet, int startRow, String title, String value) {
+        Row row = sheet.createRow(startRow);
+        row.createCell(0).setCellValue(title);
+        row.createCell(1).setCellValue(value != null ? value : "N/A");
+        return startRow + 1;
+    }
+
+    // Excel stil metodları
     private CellStyle createHeaderStyle(Workbook workbook) {
         CellStyle style = workbook.createCellStyle();
         Font font = workbook.createFont();
@@ -353,10 +530,121 @@ public class TestManager {
         return style;
     }
 
-    private void saveWorkbook(Workbook workbook, String fileName) throws IOException {
-        try (FileOutputStream outputStream = new FileOutputStream(fileName)) {
-            workbook.write(outputStream);
-            System.out.println("Rapport Excel généré avec succès: " + fileName);
+    // Test adımlarının aynı olup olmadığını kontrol et
+    private boolean isSameStep(TestManager existing, TestManager newInfo) {
+        return Objects.equals(existing.getNomEtape(), newInfo.getNomEtape()) &&
+                Objects.equals(existing.getNomScenario(), newInfo.getNomScenario()) &&
+                Objects.equals(existing.getUrl(), newInfo.getUrl());
+    }
+    // Step pattern'lerini güncelle
+    private void updateStepPattern(String stepName) {
+        if (stepName != null) {
+            stepPatterns.merge(stepName, 1, Integer::sum);
+
+            // En sık kullanılan step'leri analiz et
+            if (stepPatterns.get(stepName) > 5) {
+                analysisResults.put("frequent_step",
+                        "Step '" + stepName + "' is used frequently: " +
+                                stepPatterns.get(stepName) + " times");
+            }
         }
     }
+
+    // Hata analizi yap
+    private void analyzeError(String error) {
+        if (error == null) return;
+
+        // Hata tipini belirle
+        String errorType = "unknown";
+        if (error.toLowerCase().contains("element")) {
+            errorType = "element_not_found";
+        } else if (error.toLowerCase().contains("timeout")) {
+            errorType = "timeout";
+        } else if (error.toLowerCase().contains("click")) {
+            errorType = "click_error";
+        }
+
+        // Hata analizini kaydet
+        StringBuilder analysis = new StringBuilder();
+        analysis.append("Type d'erreur: ").append(errorType).append("\n");
+
+        // Öneriler ekle
+        if (ERROR_PATTERNS.containsKey(errorType)) {
+            analysis.append("Suggestions:\n")
+                    .append(ERROR_PATTERNS.get(errorType));
+        }
+
+        // Benzer başarılı testleri bul
+        List<TestManager> similarSuccessfulTests = findSimilarSuccessfulTests(getStepType(nomEtape));
+        if (!similarSuccessfulTests.isEmpty()) {
+            analysis.append("\nExemples de tests réussis similaires:\n");
+            similarSuccessfulTests.forEach(t ->
+                    analysis.append("• ").append(t.getNomEtape())
+                            .append(" (").append(t.getResultatReel())
+                            .append(")\n")
+            );
+        }
+
+        // Analiz sonucunu kaydet
+        analysisResults.put("error_analysis", analysis.toString());
+
+        // Hata sıklığını takip et
+        String finalErrorType = errorType;
+        stepPatterns.compute(
+                "error_" + errorType,
+                (k, v) -> v == null ? 1 : v + 1
+        );
+
+        // Sık tekrarlanan hatalar için uyarı
+        if (stepPatterns.get("error_" + errorType) > 3) {
+            analysisResults.put("recurring_error",
+                    "Attention: L'erreur '" + errorType +
+                            "' s'est produite plusieurs fois. Une révision du test peut être nécessaire.");
+        }
+    }
+
+    // Yardımcı metodlar
+    private List<String> getStepHistory(String currentStep) {
+        return rapportsTests.stream()
+                .map(TestManager::getNomEtape)
+                .filter(step -> !step.equals(currentStep))
+                .distinct()
+                .collect(Collectors.toList());
+    }
+
+    private Map<String, Integer> getErrorStatistics() {
+        return stepPatterns.entrySet().stream()
+                .filter(e -> e.getKey().startsWith("error_"))
+                .collect(Collectors.toMap(
+                        e -> e.getKey().replace("error_", ""),
+                        Map.Entry::getValue
+                ));
+    }
+
+    // Test önerileri güncelle
+    private void updateTestSuggestions() {
+        List<String> suggestions = new ArrayList<>();
+
+        // Son başarılı adımlardan öneriler
+        rapportsTests.stream()
+                .filter(t -> "REUSSI".equalsIgnoreCase(t.getStatut()))
+                .map(TestManager::getNomEtape)
+                .distinct()
+                .limit(3)
+                .forEach(suggestions::add);
+
+        // Hata istatistiklerine göre öneriler
+        Map<String, Integer> errorStats = getErrorStatistics();
+        if (!errorStats.isEmpty()) {
+            suggestions.add("Vérifier les erreurs fréquentes: " +
+                    errorStats.entrySet().stream()
+                            .map(e -> e.getKey() + " (" + e.getValue() + " fois)")
+                            .collect(Collectors.joining(", ")));
+        }
+
+        testSuggestions.clear();
+        testSuggestions.addAll(suggestions);
+    }
 }
+
+
