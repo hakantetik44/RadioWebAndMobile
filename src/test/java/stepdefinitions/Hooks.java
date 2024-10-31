@@ -140,6 +140,7 @@ public class Hooks {
                         byte[] screenshot = ((TakesScreenshot) driver).getScreenshotAs(OutputType.BYTES);
                         scenario.attach(screenshot, "image/png", "screenshot-erreur");
                         infosTest.setResultatReel("Test échoué - Capture d'écran ajoutée");
+
                     }
                 } else {
                     infosTest.setStatut("RÉUSSI");
