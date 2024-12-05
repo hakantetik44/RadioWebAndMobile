@@ -142,6 +142,10 @@ pipeline {
                         ])
 
                         sh """
+                        if [ -d "target/cucumber-reports" ]; then
+                                                cd target
+                                                zip -q -r cucumber-reports.zip cucumber-reports/
+                                            fi
                             if [ -d "${ALLURE_RESULTS}" ]; then
                                 cd target && zip -q -r allure-report.zip allure-results/
                             fi
@@ -153,7 +157,7 @@ pipeline {
             }
             post {
                 always {
-                    archiveArtifacts artifacts: "${EXCEL_REPORTS}/**/*.xlsx, target/allure-report.zip", allowEmptyArchive: true
+                    archiveArtifacts artifacts: "${EXCEL_REPORTS}/**/*.xlsx,target/cucumber-reports.zip,target/allure-report.zip", allowEmptyArchive: true
                 }
             }
         }
@@ -171,6 +175,7 @@ pipeline {
 📝 Rapports:
 - Allure: ${BUILD_URL}allure/
 - Excel: ${BUILD_URL}artifact/${EXCEL_REPORTS}/
+- Cucumber: ${BUILD_URL}artifact/target/cucumber-reports/
 
 Plateforme: ${env.PLATFORM_NAME}
 ${env.PLATFORM_NAME == 'Web' ? "Navigateur: ${env.BROWSER}" : ''}
