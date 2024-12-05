@@ -1,6 +1,13 @@
 pipeline {
     agent any
 
+tools {
+    maven 'maven'
+    jdk 'JDK17'
+    allure 'Allure'
+}
+
+
     environment {
         // MacOS Homebrew paths
         JAVA_HOME = sh(script: '/usr/libexec/java_home -v 17', returnStdout: true).trim()
