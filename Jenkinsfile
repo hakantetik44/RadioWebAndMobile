@@ -1,18 +1,13 @@
 pipeline {
     agent any
 
-    tools {
-        maven 'maven'
-        jdk 'JDK17'
-        allure 'Allure'
-    }
-
     environment {
-        // MacOS specific paths from Homebrew
-        JAVA_HOME = '/usr/local/opt/openjdk@17'
+        // MacOS Homebrew paths
+        JAVA_HOME = sh(script: '/usr/libexec/java_home -v 17', returnStdout: true).trim()
         M2_HOME = '/usr/local/Cellar/maven/3.9.9/libexec'
-        PATH = "${JAVA_HOME}/bin:${M2_HOME}/bin:${PATH}"
-        MAVEN_OPTS = '-Xmx3072m'
+        PATH = "${JAVA_HOME}/bin:${M2_HOME}/bin:${env.PATH}"
+
+        // Project variables
         PROJECT_NAME = 'Radio BDD Automation Tests'
         TIMESTAMP = new Date().format('yyyy-MM-dd_HH-mm-ss')
         ALLURE_RESULTS = 'target/allure-results'
@@ -40,6 +35,31 @@ pipeline {
                     cleanWs()
                     checkout scm
 
+                    // Environment verification
+                    sh '''#!/bin/bash
+                        echo "=== Environment Verification ==="
+
+                        # Set up environment variables
+                        export JAVA_HOME=$(/usr/libexec/java_home -v 17)
+                        export M2_HOME=/usr/local/Cellar/maven/3.9.9/libexec
+                        export PATH=$JAVA_HOME/bin:$M2_HOME/bin:$PATH
+
+                        # Create directories
+                        mkdir -p ${EXCEL_REPORTS} ${ALLURE_RESULTS} target/screenshots
+
+                        # Print environment info
+                        echo "JAVA_HOME: $JAVA_HOME"
+                        echo "M2_HOME: $M2_HOME"
+                        echo "PATH: $PATH"
+
+                        # Verify Java and Maven
+                        echo "Java version:"
+                        java -version
+
+                        echo "Maven version:"
+                        mvn -v
+                    '''
+
                     if (fileExists('src/test/resources/configuration.properties')) {
                         def configContent = readFile('src/test/resources/configuration.properties')
                         def props = configContent.split('\n').collectEntries { line ->
@@ -53,28 +73,11 @@ pipeline {
 
                         env.PLATFORM_NAME = props.platformName ?: params.PLATFORM_NAME ?: 'Web'
                         env.BROWSER = env.PLATFORM_NAME == 'Web' ? (props.browser ?: params.BROWSER ?: 'chrome') : ''
-
-                        writeFile file: 'target/allure-results/environment.properties', text: """
-                            Platform=${env.PLATFORM_NAME}
-                            Browser=${env.BROWSER}
-                            Test Framework=Cucumber
-                            Language=FR
-                        """.stripIndent()
                     }
 
-                    echo """Configuration:
+                    echo """Configuration actuelle:
                     • Plateforme: ${env.PLATFORM_NAME}
                     • Navigateur: ${env.PLATFORM_NAME == 'Web' ? env.BROWSER : 'N/A'}"""
-
-                    // Verify environment setup
-                    sh """
-                        mkdir -p ${EXCEL_REPORTS} ${ALLURE_RESULTS} target/screenshots
-                        export JAVA_HOME=${JAVA_HOME}
-                        export M2_HOME=${M2_HOME}
-                        export PATH=${PATH}
-                        java -version
-                        mvn -version
-                    """
                 }
             }
         }
@@ -84,7 +87,13 @@ pipeline {
                 script {
                     try {
                         echo "📦 Installation des dépendances..."
-                        sh "mvn clean install -DskipTests -B -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn"
+                        sh '''#!/bin/bash
+                            export JAVA_HOME=$(/usr/libexec/java_home -v 17)
+                            export M2_HOME=/usr/local/Cellar/maven/3.9.9/libexec
+                            export PATH=$JAVA_HOME/bin:$M2_HOME/bin:$PATH
+
+                            mvn clean install -DskipTests
+                        '''
                     } catch (Exception e) {
                         currentBuild.result = 'FAILURE'
                         throw e
@@ -98,19 +107,16 @@ pipeline {
                 script {
                     try {
                         echo "🧪 Lancement des tests..."
+                        sh """#!/bin/bash
+                            export JAVA_HOME=\$(/usr/libexec/java_home -v 17)
+                            export M2_HOME=/usr/local/Cellar/maven/3.9.9/libexec
+                            export PATH=\$JAVA_HOME/bin:\$M2_HOME/bin:\$PATH
 
-                        def mvnCommand = "mvn test -Dtest=runner.TestRunner -DplatformName=${env.PLATFORM_NAME}"
-
-                        if (env.PLATFORM_NAME == 'Web') {
-                            mvnCommand += " -Dbrowser=${env.BROWSER}"
-                        }
-
-                        mvnCommand += """ \
-                            -Dcucumber.plugin="pretty,json:target/cucumber.json,io.qameta.allure.cucumber7jvm.AllureCucumber7Jvm" \
-                            -B -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn > test_output.log
+                            mvn test -Dtest=runner.TestRunner \\
+                                -DplatformName=${env.PLATFORM_NAME} \\
+                                ${env.PLATFORM_NAME == 'Web' ? "-Dbrowser=${env.BROWSER}" : ''} \\
+                                -Dcucumber.plugin="pretty,json:target/cucumber.json,io.qameta.allure.cucumber7jvm.AllureCucumber7Jvm"
                         """
-
-                        sh mvnCommand
                     } catch (Exception e) {
                         currentBuild.result = 'FAILURE'
                         throw e
