@@ -52,8 +52,8 @@ public class Driver {
                 ChromeOptions chromeOptions = new ChromeOptions();
                 chromeOptions.addArguments("--disable-search-engine-choice-screen");
                 chromeOptions.addArguments("--headless"); // Enable headless mode
-                chromeOptions.addArguments("--disable-gpu"); // Disable GPU acceleration
-                chromeOptions.addArguments("--window-size=1920,1080"); // Set window size
+                chromeOptions.addArguments("--disable-gpu");
+                chromeOptions.addArguments("--window-size=1920,1080");
 
                 driver = new ChromeDriver(chromeOptions);
                 break;
