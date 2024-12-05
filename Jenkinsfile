@@ -1,6 +1,12 @@
 pipeline {
     agent any
 
+    tools {
+        maven 'maven'
+        jdk 'JDK17'
+        allure 'Allure'
+    }
+
     environment {
         // Java ve Maven için kesin yolları kullan
         JAVA_HOME = '/Users/hakantetik/Library/Java/JavaVirtualMachines/corretto-17.0.13/Contents/Home'
