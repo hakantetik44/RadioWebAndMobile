@@ -9,9 +9,9 @@ pipeline {
 
     environment {
         // Java ve Maven için kesin yolları kullan
-        JAVA_HOME = '/Users/hakantetik/Library/Java/JavaVirtualMachines/corretto-17.0.13/Contents/Home'
-        M2_HOME = '/usr/local/Cellar/maven/3.9.9/libexec'
-        PATH = "${JAVA_HOME}/bin:${M2_HOME}/bin:${env.PATH}"
+          JAVA_HOME = '/usr/local/Cellar/openjdk@17/17.0.13/libexec/openjdk.jdk/Contents/Home'
+           M2_HOME = '/usr/local/Cellar/maven/3.9.9/libexec'
+           PATH = "${JAVA_HOME}/bin:${M2_HOME}/bin:${env.PATH}"
 
         // Proje değişkenleri
         PROJECT_NAME = 'Radio BDD Automation Tests'
