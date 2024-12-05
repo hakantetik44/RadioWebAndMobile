@@ -8,8 +8,9 @@ pipeline {
     }
 
     environment {
-        JAVA_HOME = "/usr/local/opt/openjdk@17"
-        M2_HOME = tool 'maven'
+        // MacOS specific paths from Homebrew
+        JAVA_HOME = '/usr/local/opt/openjdk@17'
+        M2_HOME = '/usr/local/Cellar/maven/3.9.9/libexec'
         PATH = "${JAVA_HOME}/bin:${M2_HOME}/bin:${PATH}"
         MAVEN_OPTS = '-Xmx3072m'
         PROJECT_NAME = 'Radio BDD Automation Tests'
@@ -39,17 +40,8 @@ pipeline {
                     cleanWs()
                     checkout scm
 
-                    // Varsayılan değerler
-                    env.PLATFORM_NAME = params.PLATFORM_NAME ?: 'Web'
-                    env.BROWSER = params.PLATFORM_NAME == 'Web' ? (params.BROWSER ?: 'chrome') : ''
-
-                    // Properties dosyasını kontrol et ve oku
                     if (fileExists('src/test/resources/configuration.properties')) {
-                        def configContent = sh(
-                            script: 'cat src/test/resources/configuration.properties',
-                            returnStdout: true
-                        ).trim()
-
+                        def configContent = readFile('src/test/resources/configuration.properties')
                         def props = configContent.split('\n').collectEntries { line ->
                             def parts = line.split('=')
                             if (parts.size() == 2) {
@@ -59,21 +51,29 @@ pipeline {
                             }
                         }
 
-                        if (props.platformName) env.PLATFORM_NAME = props.platformName
-                        if (props.browser && env.PLATFORM_NAME == 'Web') env.BROWSER = props.browser
+                        env.PLATFORM_NAME = props.platformName ?: params.PLATFORM_NAME ?: 'Web'
+                        env.BROWSER = env.PLATFORM_NAME == 'Web' ? (props.browser ?: params.BROWSER ?: 'chrome') : ''
+
+                        writeFile file: 'target/allure-results/environment.properties', text: """
+                            Platform=${env.PLATFORM_NAME}
+                            Browser=${env.BROWSER}
+                            Test Framework=Cucumber
+                            Language=FR
+                        """.stripIndent()
                     }
 
-                    echo """Configuration actuelle:
+                    echo """Configuration:
                     • Plateforme: ${env.PLATFORM_NAME}
                     • Navigateur: ${env.PLATFORM_NAME == 'Web' ? env.BROWSER : 'N/A'}"""
 
+                    // Verify environment setup
                     sh """
                         mkdir -p ${EXCEL_REPORTS} ${ALLURE_RESULTS} target/screenshots
-
-                        echo "=== Vérification de l'environnement ==="
                         export JAVA_HOME=${JAVA_HOME}
+                        export M2_HOME=${M2_HOME}
+                        export PATH=${PATH}
                         java -version
-                        ${M2_HOME}/bin/mvn -version
+                        mvn -version
                     """
                 }
             }
@@ -84,7 +84,7 @@ pipeline {
                 script {
                     try {
                         echo "📦 Installation des dépendances..."
-                        sh "${M2_HOME}/bin/mvn clean install -DskipTests -B -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn"
+                        sh "mvn clean install -DskipTests -B -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn"
                     } catch (Exception e) {
                         currentBuild.result = 'FAILURE'
                         throw e
@@ -99,7 +99,7 @@ pipeline {
                     try {
                         echo "🧪 Lancement des tests..."
 
-                        def mvnCommand = "${M2_HOME}/bin/mvn test -Dtest=runner.TestRunner -DplatformName=${env.PLATFORM_NAME}"
+                        def mvnCommand = "mvn test -Dtest=runner.TestRunner -DplatformName=${env.PLATFORM_NAME}"
 
                         if (env.PLATFORM_NAME == 'Web') {
                             mvnCommand += " -Dbrowser=${env.BROWSER}"
@@ -124,7 +124,7 @@ pipeline {
                 script {
                     try {
                         allure([
-                            includeProperties: false,
+                            includeProperties: true,
                             reportBuildPolicy: 'ALWAYS',
                             results: [[path: "${ALLURE_RESULTS}"]]
                         ])
