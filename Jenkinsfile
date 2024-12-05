@@ -9,9 +9,9 @@ pipeline {
 
     environment {
         // Java ve Maven için kesin yolları kullan
-          JAVA_HOME = '/usr/local/Cellar/openjdk@17/17.0.13/libexec/openjdk.jdk/Contents/Home'
-           M2_HOME = '/usr/local/Cellar/maven/3.9.9/libexec'
-           PATH = "${JAVA_HOME}/bin:${M2_HOME}/bin:${env.PATH}"
+        JAVA_HOME = '/usr/local/Cellar/openjdk@17/17.0.13/libexec/openjdk.jdk/Contents/Home'
+        M2_HOME = '/usr/local/Cellar/maven/3.9.9/libexec'
+        PATH = "${JAVA_HOME}/bin:${M2_HOME}/bin:${env.PATH}"
 
         // Proje değişkenleri
         PROJECT_NAME = 'Radio BDD Automation Tests'
@@ -135,21 +135,26 @@ pipeline {
             steps {
                 script {
                     try {
+                        // Allure Report generation
                         allure([
                             includeProperties: true,
                             reportBuildPolicy: 'ALWAYS',
                             results: [[path: "${ALLURE_RESULTS}"]]
                         ])
 
-                        sh """
-                        if [ -d "target/cucumber-reports" ]; then
-                                                cd target
-                                                zip -q -r cucumber-reports.zip cucumber-reports/
-                                            fi
-                            if [ -d "${ALLURE_RESULTS}" ]; then
+                        // Cucumber Report generation
+                        if (fileExists('target/cucumber-reports')) {
+                            sh """
+                                cd target
+                                zip -q -r cucumber-reports.zip cucumber-reports/
+                            """
+                        }
+
+                        if (fileExists("${ALLURE_RESULTS}")) {
+                            sh """
                                 cd target && zip -q -r allure-report.zip allure-results/
-                            fi
-                        """
+                            """
+                        }
                     } catch (Exception e) {
                         currentBuild.result = 'UNSTABLE'
                     }
@@ -157,6 +162,7 @@ pipeline {
             }
             post {
                 always {
+                    // Archiving the generated reports
                     archiveArtifacts artifacts: "${EXCEL_REPORTS}/**/*.xlsx,target/cucumber-reports.zip,target/allure-report.zip", allowEmptyArchive: true
                 }
             }
